@@ -1,0 +1,1309 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Asset Register</title>
+<style>[hidden]:not([hidden=until-found i]){display:none!important}img{max-width:100%}html{scroll-padding-top:env(safe-area-inset-top,0px)}</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="/shim.js"></script>
+</head><body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Readex+Pro:wght@500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one column ledger. Summary band + attention chips, tabbed views, modals for records and forms. */
+:root{
+  --bg:#f3f4f1; --surface:#ffffff; --sunk:#e8eae4; --ink:#16231f; --muted:#5d6a64; --line:#d5d9d1;
+  --accent:#1f5a4c; --accent-ink:#ffffff; --brass:#a87a2a; --brass-soft:#f4ead6;
+  --good:#2e7d4f; --warn:#b26b00; --bad:#b3352b; --paper:#ffffff;
+  --f-display:"Readex Pro",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,"Segoe UI",Helvetica,Arial,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111816; --surface:#18211e; --sunk:#202b27; --ink:#e6ece8; --muted:#97a59e; --line:#2c3833;
+  --accent:#6fbfa8; --accent-ink:#0d1714; --brass:#d9aa55; --brass-soft:#2e2615;
+  --good:#6cc493; --warn:#e3a44a; --bad:#ec7b70; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111816; --surface:#18211e; --sunk:#202b27; --ink:#e6ece8; --muted:#97a59e; --line:#2c3833;
+  --accent:#6fbfa8; --accent-ink:#0d1714; --brass:#d9aa55; --brass-soft:#2e2615;
+  --good:#6cc493; --warn:#e3a44a; --bad:#ec7b70; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:920px;margin-inline:auto;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.25}
+h1{font-size:1.7rem;font-weight:700}
+h2{font-size:1.15rem;font-weight:700}
+h3{font-size:1rem}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);background:var(--surface);
+  border-radius:8px;padding:9px 14px;cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--bad)}
+.btn.sm{padding:4px 9px;font-size:.8rem}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn svg{width:18px;height:18px;flex:none}
+.link{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:2px;font:inherit;text-align:start}
+
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px}
+.summary{display:flex;gap:24px;flex-wrap:wrap}
+.stat .k{font-size:.72rem;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.stat .v{font-family:var(--f-display);font-size:1.35rem;font-weight:700}
+.stat .v small{font-size:.76rem;font-weight:500;color:var(--muted);margin-inline-start:4px}
+.attention{display:flex;flex-wrap:wrap;gap:8px}
+.attention:empty{display:none}
+.attn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 12px;font-size:.84rem;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.attn b{font-variant-numeric:tabular-nums}
+.attn.bad b{color:var(--bad)} .attn.warn b{color:var(--warn)}
+
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 12px;cursor:pointer;font-weight:600;color:var(--muted);white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab .count{font-weight:500;font-size:.76rem;background:var(--sunk);border-radius:999px;padding:0 7px;margin-inline-start:6px}
+.view{display:flex;flex-direction:column;gap:14px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:14px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.drop{border:1.5px dashed var(--line);border-radius:var(--r);padding:14px;text-align:center;color:var(--muted);font-size:.9rem}
+.drop.over{border-color:var(--accent);background:var(--sunk)}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap}
+.thumbs img{width:76px;height:76px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.status{display:flex;align-items:center;gap:10px;font-size:.92rem}
+.spin{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:3s}}
+.note{font-size:.84rem;color:var(--muted)}
+.err{color:var(--bad);font-size:.9rem}
+
+.form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px}
+.form .full{grid-column:1/-1}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label,.lbl{font-size:.8rem;color:var(--muted);font-weight:500}
+.field input,.field select,.field textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+.field textarea{min-height:60px;resize:vertical}
+.mono{font-family:var(--f-mono)}
+.inrow{display:flex;gap:6px;align-items:stretch}.inrow input{flex:1;min-width:0}
+.pricebox{grid-column:1/-1;background:var(--brass-soft);border-radius:var(--r);padding:12px 14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.pricebox .field input{background:var(--surface)}
+.pricebox .why{grid-column:1/-1;font-size:.84rem;color:var(--muted)}
+.form-actions{grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap}
+.radios{display:flex;gap:16px;flex-wrap:wrap}
+.radios label{display:flex;gap:6px;align-items:center;font-size:.92rem;color:var(--ink)}
+.checkline{display:flex;gap:8px;align-items:center}
+@media (max-width:560px){.form{grid-template-columns:minmax(0,1fr)}.pricebox{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.pricebox .mid{grid-column:1/-1}}
+
+.search{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;width:240px;max-width:100%}
+.search.big{width:100%;padding:12px 14px;font-size:1rem}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips:empty{display:none}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 12px;font-size:.84rem;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.list{display:flex;flex-direction:column;gap:10px}
+
+.tag{display:grid;grid-template-columns:80px minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}
+.tag .ph{width:80px;height:80px;border-radius:8px;object-fit:cover;background:var(--sunk);display:block;border:0;padding:0;cursor:pointer;overflow:hidden}
+.tag .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.tag .ph.empty{display:grid;place-items:center;color:var(--muted);font-size:.72rem;text-align:center}
+.tag .body{min-width:0;display:flex;flex-direction:column;gap:3px}
+.tag h3 .link{color:var(--ink);text-decoration:none}
+.tag h3 .link:hover{text-decoration:underline}
+.meta{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.84rem;color:var(--muted);align-items:center}
+.pill{display:inline-block;font-size:.74rem;padding:1px 9px;border-radius:999px;background:var(--sunk);color:var(--ink);white-space:nowrap}
+.s-available{color:var(--good)} .s-custody{color:var(--accent);font-weight:600} .s-repair{color:var(--warn)} .s-lost{color:var(--bad)} .s-disposed{color:var(--muted)}
+.s-open{color:var(--accent);font-weight:600} .s-partial{color:var(--warn)} .s-closed{color:var(--muted)} .s-overdue{color:var(--bad);font-weight:600} .s-low{color:var(--bad);font-weight:600} .s-due{color:var(--warn);font-weight:600} .s-ok{color:var(--good)}
+.code{font-family:var(--f-mono);font-size:.78rem;color:var(--muted)}
+.serial{font-family:var(--f-mono);font-size:.8rem;background:var(--sunk);padding:1px 7px;border-radius:5px;overflow-wrap:anywhere}
+.price{text-align:end;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.price .v{font-family:var(--f-display);font-weight:700;font-size:1.08rem;color:var(--brass);white-space:nowrap}
+.price .sub{font-size:.74rem;color:var(--muted);white-space:nowrap}
+.row-actions{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;margin-top:6px}
+.confirm{font-size:.82rem;display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}
+@media (max-width:560px){
+  .tag{grid-template-columns:60px minmax(0,1fr)}
+  .tag .ph{width:60px;height:60px}
+  .price{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;justify-content:space-between;align-items:center;text-align:start;border-top:1px solid var(--line);padding-top:8px}
+  .row-actions{margin-top:0}
+}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.card .hd{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline}
+.qty{font-family:var(--f-display);font-size:1.15rem;color:var(--ink);font-weight:700}
+.person{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;text-align:start;width:100%}
+.person:hover{border-color:var(--accent)}
+.avatar{width:40px;height:40px;border-radius:50%;background:var(--sunk);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;color:var(--accent)}
+.person .r{text-align:end;font-size:.82rem;color:var(--muted)}
+.person .r b{display:block;color:var(--ink);font-family:var(--f-display)}
+
+.empty-state{background:var(--surface);border:1px dashed var(--line);border-radius:12px;padding:26px 18px;text-align:center;color:var(--muted)}
+.empty-state strong{color:var(--ink);display:block;font-family:var(--f-display);margin-bottom:4px}
+
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{text-align:start;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.72rem;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+td.r,th.r{text-align:end}
+.tscroll{overflow-x:auto}
+.dl{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px 16px}
+.dl div{min-width:0}
+.dl .lbl{display:block}
+.dl span:not(.lbl){overflow-wrap:anywhere}
+.photos{display:flex;gap:8px;overflow-x:auto}
+.photos img{height:140px;border-radius:8px;border:1px solid var(--line)}
+.qr{background:var(--paper);padding:6px;border-radius:6px;display:inline-block;line-height:0;flex:none}
+.qr svg{width:84px;height:84px}
+
+.picklist{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.pick{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer}
+.pick:last-child{border-bottom:0}
+.pick small{color:var(--muted)}
+.pick.off{cursor:default;opacity:.7}
+.checks{display:flex;flex-direction:column;gap:6px}
+.checks label{display:flex;gap:8px;align-items:center}
+
+.overlay{position:fixed;inset:0;background:color-mix(in srgb,var(--ink) 45%,transparent);display:grid;place-items:center;z-index:20;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.modal{background:var(--surface);border-radius:14px;padding:18px;width:min(760px,100%);max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:14px}
+.modal .x{margin-inline-start:auto}
+.toast{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));inset-inline:0;margin-inline:auto;width:fit-content;max-width:calc(100% - 32px);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:999px;font-size:.88rem;z-index:30}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Asset Register</h1>
+      <div class="muted">Studio, kit, IT and office assets: where they are, who holds them, and what they're worth.</div>
+    </div>
+    <div class="summary">
+      <div class="stat"><div class="k">Market value</div><div class="v num" id="sumMarket">—</div></div>
+      <div class="stat"><div class="k">Book value</div><div class="v num" id="sumBook">—</div></div>
+      <div class="stat"><div class="k">Out now</div><div class="v num" id="sumOut">—</div></div>
+    </div>
+  </header>
+  <div class="attention" id="attention"></div>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-view="assets" id="tab-assets">Assets<span class="count num" id="cAssets">0</span></button>
+    <button class="tab" role="tab" data-view="stock" id="tab-stock">Stock<span class="count num" id="cStock">0</span></button>
+    <button class="tab" role="tab" data-view="kits" id="tab-kits">Kits<span class="count num" id="cKits">0</span></button>
+    <button class="tab" role="tab" data-view="people" id="tab-people">Employees<span class="count num" id="cPeople">0</span></button>
+    <button class="tab" role="tab" data-view="custody" id="tab-custody">Custody<span class="count num" id="cCustody">0</span></button>
+    <button class="tab" role="tab" data-view="counts" id="tab-counts">Counts<span class="count num" id="cCounts">0</span></button>
+    <button class="tab" role="tab" data-view="setup" id="tab-setup">Setup</button>
+  </nav>
+
+  <!-- ASSETS -->
+  <section class="view" id="v-assets" role="tabpanel" aria-labelledby="tab-assets">
+    <div class="panel">
+      <div class="row">
+        <h2>Add an asset</h2>
+        <div class="actions">
+          <label class="btn primary" for="camInput">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+            Take photo
+          </label>
+          <label class="btn" for="fileInput">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg>
+            Choose photos
+          </label>
+          <button class="btn ghost" id="manualBtn" type="button">Add manually</button>
+        </div>
+        <input id="camInput" type="file" accept="image/*" capture="environment" hidden>
+        <input id="fileInput" type="file" accept="image/*" multiple hidden>
+      </div>
+      <div class="drop" id="drop">Or drop photos here. One shot of the item and one of its serial label gives the best result.</div>
+      <div class="thumbs" id="thumbs" hidden></div>
+      <div class="status" id="status" hidden><span class="spin"></span><span id="statusText"></span></div>
+      <div class="err" id="deskErr" hidden></div>
+      <form class="form" id="newForm" hidden></form>
+      <div class="note" id="capNote"></div>
+    </div>
+    <div class="row">
+      <input class="search" id="qAssets" type="search" placeholder="Search name, code, serial or holder">
+      <div class="actions">
+        <button class="btn" data-act="handover" type="button">Hand over</button>
+        <button class="btn" data-act="labels" type="button">Print QR labels</button>
+      </div>
+    </div>
+    <div class="chips" id="groupChips"></div>
+    <div class="chips" id="statusChips"></div>
+    <div class="list" id="assetList"><div class="empty-state"><strong>Loading assets…</strong>Your saved assets will appear here.</div></div>
+  </section>
+
+  <!-- STOCK -->
+  <section class="view" id="v-stock" role="tabpanel" aria-labelledby="tab-stock" hidden>
+    <div class="row">
+      <div class="note">Consumables are counted by quantity, not item by item. You get an alert when an item drops to its reorder level.</div>
+      <button class="btn primary" data-act="new-stock" type="button">Add stock item</button>
+    </div>
+    <div class="list" id="stockList"></div>
+  </section>
+
+  <!-- KITS -->
+  <section class="view" id="v-kits" role="tabpanel" aria-labelledby="tab-kits" hidden>
+    <div class="row">
+      <div class="note">A kit is a set of production gear that goes out together, such as a camera body with its batteries, charger and cards.</div>
+      <button class="btn primary" data-act="new-kit" type="button">New kit</button>
+    </div>
+    <div class="list" id="kitList"></div>
+  </section>
+
+  <!-- PEOPLE -->
+  <section class="view" id="v-people" role="tabpanel" aria-labelledby="tab-people" hidden>
+    <input class="search big" id="qPeople" type="search" placeholder="Type an employee name or ID to see what they hold">
+    <div class="row">
+      <div class="note">Use the same employee ID as your HR system so the two can be linked later.</div>
+      <button class="btn primary" data-act="new-person" type="button">Add employee</button>
+    </div>
+    <div class="list" id="peopleList"></div>
+  </section>
+
+  <!-- CUSTODY -->
+  <section class="view" id="v-custody" role="tabpanel" aria-labelledby="tab-custody" hidden>
+    <div class="row">
+      <div class="chips" id="custodyChips"></div>
+      <button class="btn primary" data-act="handover" type="button">New handover</button>
+    </div>
+    <div class="list" id="custodyList"></div>
+  </section>
+
+  <!-- COUNTS -->
+  <section class="view" id="v-counts" role="tabpanel" aria-labelledby="tab-counts" hidden>
+    <div class="panel">
+      <h2>Count schedule</h2>
+      <div class="tscroll"><table><thead><tr><th>Group</th><th>Every</th><th>Last counted</th><th>Next due</th><th></th></tr></thead><tbody id="countSchedule"></tbody></table></div>
+      <div class="row">
+        <div class="actions">
+          <select class="search" id="countLoc" aria-label="Location to count" style="width:auto"></select>
+          <button class="btn sm" data-act="count-loc" type="button">Count this room</button>
+        </div>
+        <div class="actions">
+          <select class="search" id="countKit" aria-label="Kit to count" style="width:auto"></select>
+          <button class="btn sm" data-act="count-kit" type="button">Count this kit</button>
+        </div>
+      </div>
+    </div>
+    <h2>Count history</h2>
+    <div class="list" id="countList"></div>
+  </section>
+
+  <!-- SETUP -->
+  <section class="view" id="v-setup" role="tabpanel" aria-labelledby="tab-setup" hidden>
+    <div class="panel">
+      <h2>Company</h2>
+      <div class="form">
+        <div class="field"><label for="setCompany">Company name on forms and labels</label><input id="setCompany" placeholder="Your studio or company name"></div>
+        <div class="field"><label for="setThreshold">Capitalization threshold (EGP)</label><input id="setThreshold" type="number" min="0" inputmode="numeric" placeholder="e.g. 5000"></div>
+      </div>
+      <div class="note">Items that cost less than the threshold are marked "Expensed". They are still tracked, but they don't count toward book value.</div>
+    </div>
+    <div class="panel">
+      <div class="row"><h2>Locations</h2>
+        <form class="actions" id="locForm"><input class="search" id="locName" placeholder="e.g. Studio A, Office 1, Storeroom" required><button class="btn primary sm" type="submit">Add location</button></form>
+      </div>
+      <div class="list" id="locList"></div>
+    </div>
+    <div class="panel">
+      <h2>Export</h2>
+      <div class="note">CSV files open in Excel. Each row carries the asset code and employee ID, so they can be imported into your HR or accounting system.</div>
+      <div class="actions">
+        <button class="btn" data-csv="assets" type="button">Assets</button>
+        <button class="btn" data-csv="stock" type="button">Stock</button>
+        <button class="btn" data-csv="employees" type="button">Employees</button>
+        <button class="btn" data-csv="custody" type="button">Custody</button>
+        <button class="btn" data-csv="maintenance" type="button">Maintenance</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="overlay" id="overlay" hidden><div class="modal" role="dialog" aria-modal="true" id="modal"></div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script>
+const APP_URL = location.origin + location.pathname;
+let BLOB = "/_blob/";
+const GROUPS = {
+  studio:{label:"Studio installed",short:"Studio",prefix:"ST",cls:"fixed",life:8,every:182,hint:"Built into the studio. Never leaves the building."},
+  kit:{label:"Production kit",short:"Production kit",prefix:"PK",cls:"fixed",life:5,every:30,hint:"Movable gear that goes out on shoots."},
+  it:{label:"IT and devices",short:"IT",prefix:"IT",cls:"fixed",life:3,every:91,hint:"Assigned to one person for daily work."},
+  office:{label:"Office furniture and equipment",short:"Office",prefix:"OF",cls:"fixed",life:7,every:365,hint:"Belongs to a room, not a person."},
+  consumable:{label:"Consumables and stock",short:"Stock",prefix:"CS",cls:"current",life:0,every:30,hint:"Used up, or bought to resell. Counted by quantity."}
+};
+const GKEYS = Object.keys(GROUPS);
+const TYPES = [["CAM","Camera"],["LEN","Lens"],["LGT","Lighting"],["GRP","Stands and grip"],["AUD","Audio"],["MON","Monitor"],["GMB","Gimbal or stabilizer"],["DRN","Drone"],["ACC","Accessory"],["BKD","Backdrop system"],["RIG","Rigging"],["PWR","Power distribution"],["LAP","Laptop"],["WKS","Workstation"],["PHN","Phone"],["TAB","Tablet"],["DRV","Storage drive"],["NET","Network equipment"],["DSK","Desk"],["CHR","Chair"],["CAB","Cabinet or shelf"],["PRN","Printer"],["AC","Air conditioner"],["APL","Appliance"],["VEH","Vehicle"],["BAT","Batteries"],["GEL","Gels and filters"],["TAP","Tape"],["PAP","Backdrop paper"],["SUP","Supplies"],["OTH","Other"]];
+const TCODES = TYPES.map(t=>t[0]);
+const typeLabel = c => (TYPES.find(t=>t[0]===c)||[0,"Other"])[1];
+const CONDS = ["New","Excellent","Good","Used","Needs repair"];
+const STATUS = {available:"Available",custody:"In custody",repair:"Under repair",lost:"Lost",disposed:"Disposed"};
+const CTYPES = {shoot:"Shoot check-out",assignment:"Long-term assignment"};
+const TERMS = [
+  "I received the items listed above in the condition stated, with their accessories.",
+  "I will use them only for company work and will not lend them to anyone else.",
+  "I will return them by the return date, whenever the company asks, and before my last working day.",
+  "I will report any damage, loss or theft within 24 hours. For theft I will also file a police report.",
+  "I am responsible for loss or damage caused by my negligence or misuse, within the limits of Egyptian labor law."
+];
+const CLEAR_CHECKS = [["devices","Laptop, phone and drives returned and wiped"],["accounts","Email and system accounts closed"],["access","Access cards and keys returned"],["damages","Damages and losses settled"]];
+
+const fmt = new Intl.NumberFormat("en-EG",{maximumFractionDigits:0});
+const egp = n => n==null||n===""||isNaN(n) ? "—" : fmt.format(n)+" EGP";
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+const today = () => new Date().toISOString().slice(0,10);
+const dfmt = t => t ? new Date(t).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—";
+const addDays = (t,d) => new Date(new Date(t).getTime()+d*864e5).toISOString().slice(0,10);
+const initials = n => String(n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]).join("").toUpperCase();
+const sum = (arr,f) => arr.reduce((s,x)=>s+(Number(f(x))||0),0);
+function nextNo(codes,prefix){ const m=codes.filter(c=>String(c||"").startsWith(prefix)).map(c=>parseInt(String(c).slice(prefix.length).replace(/\D/g,""))||0); return prefix+String(Math.max(0,...m)+1).padStart(4,"0"); }
+
+let db=null, store=null, sample=null, downloads=null;
+let assets=[], people=[], custody=[], kits=[], locations=[], maint=[], counts=[], moves=[], settings={};
+let gFilter="all", sFilter="active", aQuery="", pQuery="", cFilter="active";
+let pending={blobs:[]}, modalView=null, hashDone=false;
+
+const groupOf = a => GROUPS[a.group] ? a.group : "kit";
+const isStock = a => groupOf(a)==="consumable";
+const live = () => assets.filter(a=>!isStock(a) && a.status!=="disposed");
+const stockItems = () => assets.filter(a=>isStock(a) && a.status!=="disposed");
+const person = id => people.find(p=>p.id===id);
+const asset = id => assets.find(a=>a.id===id);
+const kit = id => kits.find(k=>k.id===id);
+const loc = id => locations.find(l=>l.id===id);
+const isOverdue = c => c.status!=="closed" && c.type!=="assignment" && c.dueAt && c.dueAt < today();
+const isLow = a => a.reorderLevel!=null && a.reorderLevel!=="" && Number(a.qty||0) <= Number(a.reorderLevel);
+const expensed = a => settings.threshold && a.purchasePrice!=null && a.purchasePrice!=="" && Number(a.purchasePrice) < Number(settings.threshold);
+function bookValue(a){
+  if(a.status==="disposed"||a.purchasePrice==null||a.purchasePrice===""||!a.purchaseDate) return null;
+  if(expensed(a)) return 0;
+  const life=Number(a.usefulLife ?? GROUPS[groupOf(a)].life); if(!life) return Number(a.purchasePrice);
+  const yrs=(Date.now()-Date.parse(a.purchaseDate))/(365.25*864e5);
+  return Math.max(0, Math.round(Number(a.purchasePrice)*(1-Math.max(0,yrs)/life)));
+}
+
+function toast(msg){const t=$("toast");t.textContent=msg;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,3000)}
+function setStatus(txt){$("status").hidden=!txt;$("statusText").textContent=txt||""}
+function setErr(el,txt){const e=$(el); if(!e) return; e.hidden=!txt; e.textContent=txt||""}
+const need = () => { if(!db){ toast("The register is not connected. Check the Supabase settings and reload"); return false; } return true; };
+const optList = (pairs,v) => pairs.map(([k,l])=>`<option value="${esc(k)}"${String(k)===String(v??"")?" selected":""}>${esc(l)}</option>`).join("");
+function qrSvg(text,cell=3){
+  try{ const q=qrcode(0,"M"); q.addData(text); q.make(); return q.createSvgTag(cell,0); }catch{ return ""; }
+}
+
+/* ---------- modal ---------- */
+function openModal(html,mv=null){ modalView=mv; $("modal").innerHTML=html; $("overlay").hidden=false; $("modal").scrollTop=0; }
+function closeModal(){ $("overlay").hidden=true; $("modal").innerHTML=""; modalView=null; }
+$("overlay").addEventListener("click",e=>{ if(e.target.id==="overlay") closeModal(); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape" && !$("overlay").hidden) closeModal(); });
+const head = t => `<div class="row"><h2>${t}</h2><button class="btn ghost sm x" type="button" data-act="close">Close</button></div>`;
+
+/* ---------- tabs ---------- */
+const VIEWS=["assets","stock","kits","people","custody","counts","setup"];
+function show(v){ for(const k of VIEWS){ $("v-"+k).hidden=k!==v; $("tab-"+k).setAttribute("aria-selected",k===v); } }
+document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>show(t.dataset.view)));
+
+/* ---------- asset form ---------- */
+function assetFormHTML(p,a={}){
+  const g=GROUPS[a.group]?a.group:"kit";
+  const st=(a.status==="custody"||a.status==="disposed") ? `<input value="${STATUS[a.status]}" disabled>` :
+    `<select id="${p}status">${optList(Object.entries(STATUS).filter(([k])=>k!=="custody"&&k!=="disposed"),a.status||"available")}</select>`;
+  return `
+  <div class="field full"><label for="${p}name">Asset name</label><input id="${p}name" required value="${esc(a.name)}"></div>
+  <div class="field"><label for="${p}group">Group</label><select id="${p}group" data-grp="${p}">${optList(GKEYS.map(k=>[k,GROUPS[k].label]),g)}</select></div>
+  <div class="field"><label for="${p}type">Type</label><select id="${p}type">${optList(TYPES,a.type||"OTH")}</select></div>
+  <div class="field"><label for="${p}assetClass">Accounting class</label><select id="${p}assetClass">${optList([["fixed","Fixed asset"],["current","Current asset"]],a.assetClass||GROUPS[g].cls)}</select></div>
+  <div class="field" data-hide="consumable"><label for="${p}condition">Condition</label><select id="${p}condition">${optList(CONDS.map(c=>[c,c]),a.condition||"Good")}</select></div>
+  <div class="field"><label for="${p}brand">Brand</label><input id="${p}brand" value="${esc(a.brand)}"></div>
+  <div class="field"><label for="${p}model">Model</label><input id="${p}model" value="${esc(a.model)}"></div>
+  <div class="field" data-hide="consumable"><label for="${p}serial">Serial number</label><div class="inrow"><input id="${p}serial" class="mono" value="${esc(a.serial)}" placeholder="Type or scan the label"><label class="btn sm" for="${p}scan" title="Read the serial from a photo of the label">Scan label</label></div><input id="${p}scan" data-scan="${p}" type="file" accept="image/*" capture="environment" hidden></div>
+  <div class="field" data-hide="consumable"><label for="${p}status">Status</label>${st}</div>
+  <div class="field"><label for="${p}locationId">Location</label><select id="${p}locationId">${optList([["","Not set"],...locations.map(l=>[l.id,l.name])],a.locationId)}</select></div>
+  <div class="field" data-only="kit"><label for="${p}kitId">Kit</label><select id="${p}kitId">${optList([["","Not in a kit"],...kits.map(k=>[k.id,k.code+" · "+k.name])],a.kitId)}</select></div>
+  <div class="field" data-only="consumable"><label for="${p}qty">Quantity on hand</label><input id="${p}qty" type="number" min="0" inputmode="numeric" value="${a.qty ?? ""}"></div>
+  <div class="field" data-only="consumable"><label for="${p}unit">Unit</label><input id="${p}unit" value="${esc(a.unit||"pcs")}" placeholder="pcs, rolls, packs"></div>
+  <div class="field" data-only="consumable"><label for="${p}reorderLevel">Reorder when at or below</label><input id="${p}reorderLevel" type="number" min="0" inputmode="numeric" value="${a.reorderLevel ?? ""}"></div>
+  <div class="field"><label for="${p}purchaseDate">Purchase date</label><input id="${p}purchaseDate" type="date" value="${esc(a.purchaseDate)}"></div>
+  <div class="field"><label for="${p}purchasePrice">Purchase cost (EGP)</label><input id="${p}purchasePrice" type="number" min="0" inputmode="numeric" value="${a.purchasePrice ?? ""}"></div>
+  <div class="field"><label for="${p}supplier">Supplier / invoice no.</label><input id="${p}supplier" value="${esc(a.supplier)}"></div>
+  <div class="field" data-hide="consumable"><label for="${p}usefulLife">Useful life (years)</label><input id="${p}usefulLife" type="number" min="0" step="0.5" inputmode="decimal" value="${a.usefulLife ?? GROUPS[g].life}"></div>
+  <div class="field" data-hide="consumable"><label for="${p}warrantyEnd">Warranty ends</label><input id="${p}warrantyEnd" type="date" value="${esc(a.warrantyEnd)}"></div>
+  <div class="pricebox" data-hide="consumable">
+    <div class="field"><label for="${p}priceLow">Low</label><input id="${p}priceLow" type="number" min="0" inputmode="numeric" value="${a.priceLow ?? ""}"></div>
+    <div class="field mid"><label for="${p}marketPrice">Current market value (EGP)</label><input id="${p}marketPrice" type="number" min="0" inputmode="numeric" value="${a.marketPrice ?? ""}"></div>
+    <div class="field"><label for="${p}priceHigh">High</label><input id="${p}priceHigh" type="number" min="0" inputmode="numeric" value="${a.priceHigh ?? ""}"></div>
+    <div class="why" id="${p}why">${esc(a.priceNote || "")}</div>
+  </div>
+  <div class="field full"><label for="${p}notes">Notes and accessories</label><textarea id="${p}notes" placeholder="e.g. 2 batteries, charger, bag">${esc(a.notes)}</textarea></div>
+  <div class="note full" id="${p}hint">${esc(GROUPS[g].hint)}</div>
+  <div class="form-actions">
+    <button class="btn primary" type="submit">Save</button>
+    <button class="btn" type="button" data-f="estimate" data-hide="consumable">Re-estimate value</button>
+    <button class="btn ghost" type="button" data-f="cancel">Cancel</button>
+  </div>`;
+}
+function syncForm(p,changed){
+  const sel=$(p+"group"); if(!sel) return;
+  const g=sel.value, form=sel.closest("form");
+  form.querySelectorAll("[data-only]").forEach(el=>el.hidden=el.dataset.only!==g);
+  form.querySelectorAll("[data-hide]").forEach(el=>el.hidden=el.dataset.hide===g);
+  $(p+"hint").textContent=GROUPS[g].hint;
+  if(changed){ $(p+"assetClass").value=GROUPS[g].cls; $(p+"usefulLife").value=GROUPS[g].life||""; }
+}
+document.addEventListener("change",e=>{ const s=e.target.closest("select[data-grp]"); if(s) syncForm(s.dataset.grp,true); });
+const FIELDS=["name","group","type","assetClass","condition","brand","model","serial","status","locationId","kitId","qty","unit","reorderLevel","purchaseDate","purchasePrice","supplier","usefulLife","warrantyEnd","priceLow","marketPrice","priceHigh","notes"];
+const NUMS=new Set(["qty","reorderLevel","purchasePrice","usefulLife","priceLow","marketPrice","priceHigh"]);
+function readAsset(p){
+  const o={};
+  for(const f of FIELDS){ const el=$(p+f); if(!el) continue; const v=el.value.trim(); o[f]=NUMS.has(f)?(v===""?null:Number(v)):v; }
+  o.priceNote=$(p+"why").textContent.trim();
+  if(o.group!=="kit") o.kitId="";
+  if(o.group==="consumable"){ o.status="available"; o.serial=""; }
+  return o;
+}
+function fillAsset(p,a){
+  if(GROUPS[a.group]){ $(p+"group").value=a.group; syncForm(p,true); }
+  if(a.type && !TCODES.includes(a.type)) a.type="OTH";
+  for(const f of FIELDS){ const el=$(p+f); if(el && f!=="status" && f!=="group" && a[f]!==undefined && a[f]!==null && a[f]!=="") el.value=a[f]; }
+  if(a.priceNote) $(p+"why").textContent=a.priceNote;
+}
+
+/* ---------- Claude ---------- */
+const SCHEMA = `Return JSON only, in this shape:
+{"name": "clear English name including brand and model",
+ "group": one of ${JSON.stringify(GKEYS)} where studio = built into a photo/video studio and never moved (cyclorama, lighting grid, rigging, backdrop rollers, studio AC), kit = movable production gear taken on shoots (cameras, lenses, portable lights, stands, audio, gimbals, drones), it = computers and devices assigned to a person (laptops, phones, tablets, drives, office monitors), office = furniture and office equipment that stays in a room (desks, chairs, cabinets, printers), consumable = used up or bought as stock (batteries, gels, tape, backdrop paper, supplies),
+ "type": one of ${JSON.stringify(TCODES)} meaning ${TYPES.map(t=>t[0]+"="+t[1]).join(", ")},
+ "assetClass": "fixed" for long-term use over a year, "current" for consumables and items for resale,
+ "brand": "", "model": "",
+ "serial": "the serial number, IMEI or service tag exactly as printed in the photo, or \\"\\" if not visible. Never guess.",
+ "condition": one of ${JSON.stringify(CONDS)},
+ "priceLow": number, "marketPrice": number, "priceHigh": number,
+ "priceNote": "one or two sentences: what this price represents (new/used) and what it is based on",
+ "notes": "useful visible details (specs, color, accessories, defects)"}
+All prices in Egyptian pounds (EGP), whole numbers, reflecting the current Egyptian market for an item in this condition. If unsure, widen the range.`;
+async function identify(blobs){
+  return sample.json(`You are an asset appraiser for a photo and video production company in Egypt. Today is ${today()}.
+The attached ${blobs.length} photo(s) show one asset the company owns. Identify it precisely, read any label or nameplate for the serial or model, judge its condition from the photo, and estimate its current market value.
+${SCHEMA}`,{images:blobs});
+}
+async function reestimate(a){
+  return sample.json(`You are an asset appraiser in Egypt. Today is ${today()}.
+Estimate the current Egyptian market value of this asset:
+${JSON.stringify({name:a.name,type:typeLabel(a.type),brand:a.brand,model:a.model,condition:a.condition,purchaseDate:a.purchaseDate,notes:a.notes})}
+Return JSON only: {"priceLow": number, "marketPrice": number, "priceHigh": number, "priceNote": "one or two sentences on the basis of the estimate"}
+Prices in EGP, whole numbers.`,{cache:false});
+}
+async function readLabel(blob){
+  return sample.json(`The attached photo shows a label, nameplate, sticker or screen on an asset (for example the underside of a camera, the back of a laptop, or a box).
+Read it carefully, character by character. Return JSON only:
+{"serial": "the serial number (S/N, SN, Serial No., IMEI, Service Tag) exactly as printed, keeping letters, digits and dashes; \\"\\" if none is readable",
+ "brand": "manufacturer if printed, else \\"\\"", "model": "model name or number if printed, else \\"\\"",
+ "text": "all other readable text on the label, one item per line (part numbers, MAC address, manufacture date, ratings)",
+ "confidence": "high" | "medium" | "low"}
+Never guess a character you cannot read. Do not confuse O with 0 or I with 1 unless the label makes it clear.`,{images:[blob],cache:false});
+}
+function sampleErr(e){
+  if(e?.code==="not_granted") return "Photo identification is not set up on the server (missing API key).";
+  if(e?.code==="rate_limited") return "Too many requests in a row. Wait a minute and try again.";
+  if(e?.code==="image_rejected") return "That image type isn't supported. Try a JPG or PNG.";
+  return "Claude couldn't read this one. Fill in the details yourself or try a clearer photo.";
+}
+async function runEstimate(p,btn){
+  if(!sample){ toast("Automatic estimates aren't available here"); return; }
+  const a=readAsset(p); if(!a.name){ toast("Enter the asset name first"); return; }
+  btn.disabled=true; const old=btn.textContent; btn.textContent="Estimating…";
+  try{ fillAsset(p,await reestimate(a)); toast("Value updated"); }
+  catch(e){ toast(sampleErr(e)); }
+  finally{ btn.disabled=false; btn.textContent=old; }
+}
+
+/* ---------- photos and label scan ---------- */
+async function shrink(file){
+  try{
+    const bmp=await createImageBitmap(file);
+    const s=Math.min(1,1600/Math.max(bmp.width,bmp.height));
+    const c=document.createElement("canvas"); c.width=Math.round(bmp.width*s); c.height=Math.round(bmp.height*s);
+    c.getContext("2d").drawImage(bmp,0,0,c.width,c.height);
+    return await new Promise(r=>c.toBlob(b=>r(b||file),"image/jpeg",0.85));
+  }catch{ return file; }
+}
+document.addEventListener("change",async e=>{
+  const inp=e.target.closest("input[data-scan]"); if(!inp||!inp.files.length) return;
+  const p=inp.dataset.scan, file=inp.files[0]; inp.value="";
+  if(!sample){ toast("Label scan is not available (server API key missing)"); return; }
+  const btn=document.querySelector(`label[for="${p}scan"]`); const old=btn.textContent; btn.textContent="Reading…";
+  try{
+    const r=await readLabel(await shrink(file));
+    if(r.serial) $(p+"serial").value=r.serial;
+    if(r.brand && !$(p+"brand").value) $(p+"brand").value=r.brand;
+    if(r.model && !$(p+"model").value) $(p+"model").value=r.model;
+    if(r.text){ const n=$(p+"notes"); n.value=(n.value?n.value+"\n":"")+"Label: "+String(r.text).trim(); }
+    toast(r.serial?`Serial read${r.confidence==="low"?" (low confidence, please check)":""}: ${r.serial}`:"No serial found on this label. Try a closer, sharper photo.");
+  }catch(err){ toast(sampleErr(err)); }
+  finally{ btn.textContent=old; }
+});
+
+/* ---------- add asset ---------- */
+async function saveNewAsset(a,blobs){
+  const photoIds=[];
+  if(store && blobs.length){ for(const b of blobs){ try{ photoIds.push((await store.upload(b,{type:b.type||"image/jpeg"})).id) }catch{} } }
+  const g=GROUPS[a.group]?a.group:"kit", code=nextNo(assets.map(x=>x.code),`${GROUPS[g].prefix}-${a.type||"OTH"}-`);
+  const now=Date.now();
+  await db.collection("assets").add({...a,code,photoIds,holderId:null,custodyId:null,createdAt:now,priceUpdatedAt:a.marketPrice!=null?now:null});
+  return code;
+}
+function openNewForm(){ const f=$("newForm"); f.innerHTML=assetFormHTML("n_",{group:"kit"}); f.hidden=false; syncForm("n_",false); }
+function resetDesk(){ pending={blobs:[]}; $("newForm").hidden=true; $("newForm").innerHTML=""; $("thumbs").hidden=true; $("thumbs").innerHTML=""; setErr("deskErr",""); setStatus(""); }
+async function handleFiles(files){
+  files=[...files].filter(f=>f.type.startsWith("image/")||f.type===""); if(!files.length) return;
+  if(!db){ setErr("deskErr","The register isn't connected. Check the Supabase settings and reload."); return; }
+  setErr("deskErr","");
+  const limit=(await sample?.limits().catch(()=>null))?.images?.maxCount||4;
+  const blobs=await Promise.all(files.slice(0,limit).map(shrink));
+  pending={blobs:[...pending.blobs,...blobs].slice(-limit)};
+  $("thumbs").hidden=false;
+  $("thumbs").innerHTML=pending.blobs.map(b=>`<img alt="Asset photo" src="${URL.createObjectURL(b)}">`).join("");
+  openNewForm();
+  if(!sample){ setErr("deskErr","Automatic identification isn't available in this view. Fill in the details yourself."); return; }
+  setStatus("Claude is identifying the asset and estimating its value…");
+  try{ fillAsset("n_",await identify(pending.blobs)); toast("Asset identified. Review the details and save."); }
+  catch(e){ setErr("deskErr",sampleErr(e)); }
+  finally{ setStatus(""); }
+}
+$("newForm").addEventListener("click",e=>{ const f=e.target.closest("[data-f]")?.dataset.f; if(f==="cancel") resetDesk(); if(f==="estimate") runEstimate("n_",e.target); });
+$("newForm").addEventListener("submit",async e=>{
+  e.preventDefault(); const b=e.submitter; if(b) b.disabled=true;
+  try{ setStatus("Saving…"); const code=await saveNewAsset(readAsset("n_"),pending.blobs); resetDesk(); toast("Saved as "+code); }
+  catch{ setStatus(""); setErr("deskErr","Couldn't save. Check that you have edit access to this page and try again."); if(b) b.disabled=false; }
+});
+$("camInput").addEventListener("change",e=>{handleFiles(e.target.files);e.target.value=""});
+$("fileInput").addEventListener("change",e=>{handleFiles(e.target.files);e.target.value=""});
+$("manualBtn").addEventListener("click",()=>{ if(!need()) return; openNewForm(); $("n_name").focus(); });
+const drop=$("drop");
+["dragenter","dragover"].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.add("over")}));
+["dragleave","drop"].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.remove("over")}));
+drop.addEventListener("drop",e=>handleFiles(e.dataTransfer.files));
+
+function openAssetForm(id,preset={}){
+  if(!need()) return;
+  const a=id?asset(id):preset; if(!a) return;
+  openModal(`${head(id?"Edit "+esc(a.code):"Add stock item")}<form class="form" id="mForm">${assetFormHTML("m_",a)}</form>`);
+  syncForm("m_",false);
+  const form=$("mForm");
+  form.addEventListener("click",e=>{ const f=e.target.closest("[data-f]")?.dataset.f; if(f==="cancel") id?openDetail(id):closeModal(); if(f==="estimate") runEstimate("m_",e.target); });
+  form.addEventListener("submit",async e=>{
+    e.preventDefault(); const b=e.submitter; if(b) b.disabled=true;
+    const d=readAsset("m_");
+    try{
+      if(id){
+        if(a.status==="custody"||a.status==="disposed") delete d.status;
+        if(a.marketPrice!==d.marketPrice) d.priceUpdatedAt=Date.now();
+        await db.doc("assets/"+id).update(d); toast("Changes saved"); openDetail(id);
+      }else{ const code=await saveNewAsset(d,[]); closeModal(); toast("Saved as "+code); }
+    }catch{ toast("Couldn't save"); if(b) b.disabled=false; }
+  });
+}
+
+/* ---------- assets list ---------- */
+function renderAssets(){
+  const base=assets.filter(a=>!isStock(a));
+  const gc={all:base.filter(a=>a.status!=="disposed").length}; for(const a of base) if(a.status!=="disposed") gc[groupOf(a)]=(gc[groupOf(a)]||0)+1;
+  $("groupChips").innerHTML=base.length?["all","studio","kit","it","office"].map(k=>`<button class="chip" type="button" data-gf="${k}" aria-pressed="${k===gFilter}">${k==="all"?"All groups":GROUPS[k].short} <span class="num">${gc[k]||0}</span></button>`).join(""):"";
+  const inG=base.filter(a=>gFilter==="all"||groupOf(a)===gFilter);
+  const sc={active:inG.filter(a=>a.status!=="disposed").length}; for(const a of inG) sc[a.status||"available"]=(sc[a.status||"available"]||0)+1;
+  const skeys=["active",...Object.keys(STATUS).filter(k=>sc[k])];
+  if(!skeys.includes(sFilter)) sFilter="active";
+  $("statusChips").innerHTML=base.length?skeys.map(k=>`<button class="chip" type="button" data-sf="${k}" aria-pressed="${k===sFilter}">${k==="active"?"All active":STATUS[k]} <span class="num">${sc[k]}</span></button>`).join(""):"";
+  const q=aQuery.toLowerCase();
+  const shown=inG.filter(a=>(sFilter==="active"?a.status!=="disposed":(a.status||"available")===sFilter)&&(!q||[a.name,a.code,a.brand,a.model,a.serial,loc(a.locationId)?.name,kit(a.kitId)?.name,person(a.holderId)?.name].some(v=>String(v||"").toLowerCase().includes(q))));
+  if(!base.length){ $("assetList").innerHTML=`<div class="empty-state"><strong>No assets yet</strong>Tap "Take photo" above. Claude fills in the group, type, serial and value, and the asset gets a code like PK-CAM-0001.</div>`; return; }
+  if(!shown.length){ $("assetList").innerHTML=`<div class="empty-state">No assets match these filters.</div>`; return; }
+  $("assetList").innerHTML=shown.map(assetCard).join("");
+}
+function assetCard(a){
+  const s=a.status||"available", ph=a.photoIds?.[0], holder=person(a.holderId), rec=custody.find(c=>c.id===a.custodyId), bv=bookValue(a);
+  return `<article class="tag">
+    ${ph?`<button class="ph" data-act="asset" data-id="${a.id}" aria-label="Open ${esc(a.name)}"><img alt="" src="${BLOB}${esc(ph)}" loading="lazy"></button>`:`<button class="ph empty" data-act="asset" data-id="${a.id}">No photo</button>`}
+    <div class="body">
+      <div class="code">${esc(a.code||"")}</div>
+      <h3><button class="link" data-act="asset" data-id="${a.id}">${esc(a.name||"Unnamed asset")}</button></h3>
+      <div class="meta"><span class="pill s-${s}">${STATUS[s]}</span><span class="pill">${GROUPS[groupOf(a)].short}</span><span>${esc(typeLabel(a.type))}</span>${a.condition?`<span>${esc(a.condition)}</span>`:""}${expensed(a)?`<span class="pill">Expensed</span>`:""}</div>
+      <div class="meta">${loc(a.locationId)?`<span>${esc(loc(a.locationId).name)}</span>`:""}${kit(a.kitId)?`<span>Kit ${esc(kit(a.kitId).code)}</span>`:""}<span>Serial: ${a.serial?`<span class="serial">${esc(a.serial)}</span>`:"not recorded"}</span></div>
+      ${s==="custody"&&holder?`<div class="meta">With <button class="link" data-act="profile" data-pid="${holder.id}">${esc(holder.name)}</button> since ${dfmt(rec?.outAt)}${rec?.dueAt&&rec.type!=="assignment"?` · due ${dfmt(rec.dueAt)}`:""}${rec&&isOverdue(rec)?` <span class="pill s-overdue">Overdue</span>`:""}</div>`:""}
+    </div>
+    <div class="price">
+      <div><div class="v num">${a.marketPrice!=null?egp(a.marketPrice):"No value"}</div>
+      ${bv!=null?`<div class="sub num">Book ${egp(bv)}</div>`:""}${a.priceUpdatedAt?`<div class="sub">Valued ${dfmt(a.priceUpdatedAt)}</div>`:""}</div>
+      <div class="row-actions">
+        ${s==="available"?`<button class="btn sm" data-act="handover" data-id="${a.id}">Hand over</button>`:""}
+        ${s==="custody"&&rec?`<button class="btn sm" data-act="return" data-cid="${rec.id}">Receive back</button>`:""}
+        <button class="btn sm" data-act="asset" data-id="${a.id}">Details</button>
+      </div>
+    </div>
+  </article>`;
+}
+$("groupChips").addEventListener("click",e=>{const c=e.target.closest("[data-gf]");if(c){gFilter=c.dataset.gf;renderAssets()}});
+$("statusChips").addEventListener("click",e=>{const c=e.target.closest("[data-sf]");if(c){sFilter=c.dataset.sf;renderAssets()}});
+$("qAssets").addEventListener("input",e=>{aQuery=e.target.value.trim();renderAssets()});
+
+/* ---------- asset detail ---------- */
+function detailHTML(id){
+  const a=asset(id); if(!a) return head("Asset")+`<div class="empty-state">This asset was removed.</div>`;
+  const s=a.status||"available", g=groupOf(a), bv=bookValue(a), stock=isStock(a);
+  const hist=custody.filter(c=>c.items.some(i=>i.assetId===id)).sort((x,y)=>y.outAt-x.outAt);
+  const log=maint.filter(m=>m.assetId===id).sort((x,y)=>String(y.date).localeCompare(String(x.date)));
+  const mv=moves.filter(m=>m.assetId===id).sort((x,y)=>y.at-x.at).slice(0,15);
+  const holder=person(a.holderId);
+  const custodyBlock = hist.length?`<div class="tscroll"><table><thead><tr><th>Record</th><th>Employee</th><th>Type</th><th>Out</th><th>Back</th></tr></thead><tbody>${hist.map(c=>{const it=c.items.find(i=>i.assetId===id);return `<tr><td class="mono">${esc(c.no)}</td><td><button class="link" data-act="profile" data-pid="${c.employeeId}">${esc(c.employeeName)}</button></td><td>${CTYPES[c.type||"shoot"]}</td><td>${dfmt(c.outAt)}</td><td>${it.returnedAt?dfmt(it.returnedAt)+(it.conditionIn&&it.conditionIn!=="Good"?` <span class="pill ${it.conditionIn==="Missing"?"s-lost":"s-repair"}">${esc(it.conditionIn)}</span>`:""):"Still out"}</td></tr>`}).join("")}</tbody></table></div>`:`<div class="note">Never handed over.</div>`;
+  const maintBlock = log.length?`<div class="tscroll"><table><thead><tr><th>Date</th><th>Type</th><th>Vendor</th><th class="r">Cost</th><th>Notes</th></tr></thead><tbody>${log.map(m=>`<tr><td>${dfmt(m.date)}</td><td>${esc(m.kind)}</td><td>${esc(m.vendor||"—")}</td><td class="r num">${m.cost!=null?fmt.format(m.cost):"—"}</td><td>${esc(m.notes||"")}</td></tr>`).join("")}</tbody></table></div><div class="note">Total spent on maintenance: ${egp(sum(log,m=>m.cost))}</div>`:`<div class="note">No repairs or servicing recorded.</div>`;
+  const movesBlock = mv.length?`<div class="tscroll"><table><thead><tr><th>Date</th><th class="r">Change</th><th>Note</th><th>By</th></tr></thead><tbody>${mv.map(m=>`<tr><td>${dfmt(m.at)}</td><td class="r num">${m.delta>0?"+":""}${m.delta}</td><td>${esc(m.note||"")}</td><td>${esc(m.by||"")}</td></tr>`).join("")}</tbody></table></div>`:`<div class="note">No movements yet.</div>`;
+  return `${head(`<span class="code">${esc(a.code)}</span> ${esc(a.name)}`)}
+  ${a.photoIds?.length?`<div class="photos">${a.photoIds.map(p=>`<img alt="" src="${BLOB}${esc(p)}">`).join("")}</div>`:""}
+  <div class="meta"><span class="pill s-${s}">${STATUS[s]}</span><span class="pill">${GROUPS[g].label}</span><span class="pill">${a.assetClass==="current"?"Current asset":"Fixed asset"}</span>${expensed(a)?`<span class="pill">Expensed</span>`:""}${stock&&isLow(a)?`<span class="pill s-low">Reorder</span>`:""}${s==="custody"&&holder?`<span>With <button class="link" data-act="profile" data-pid="${holder.id}">${esc(holder.name)}</button></span>`:""}</div>
+  <div class="row" style="align-items:flex-start">
+    <div class="dl" style="flex:1 1 360px">
+      <div><span class="lbl">Type</span><span>${esc(typeLabel(a.type))}</span></div>
+      <div><span class="lbl">Brand / model</span><span>${esc([a.brand,a.model].filter(Boolean).join(" · ")||"—")}</span></div>
+      ${stock?`<div><span class="lbl">On hand</span><span class="num">${fmt.format(a.qty||0)} ${esc(a.unit||"")}</span></div><div><span class="lbl">Reorder at</span><span class="num">${a.reorderLevel??"—"}</span></div>`
+        :`<div><span class="lbl">Serial</span><span class="mono">${esc(a.serial||"—")}</span></div><div><span class="lbl">Condition</span><span>${esc(a.condition||"—")}</span></div>`}
+      <div><span class="lbl">Location</span><span>${esc(loc(a.locationId)?.name||"—")}</span></div>
+      ${g==="kit"?`<div><span class="lbl">Kit</span><span>${kit(a.kitId)?esc(kit(a.kitId).code+" · "+kit(a.kitId).name):"—"}</span></div>`:""}
+      <div><span class="lbl">Purchased</span><span>${dfmt(a.purchaseDate)}</span></div>
+      <div><span class="lbl">Supplier</span><span>${esc(a.supplier||"—")}</span></div>
+      ${!stock?`<div><span class="lbl">Warranty ends</span><span>${a.warrantyEnd?dfmt(a.warrantyEnd)+(a.warrantyEnd<today()?" (expired)":""):"—"}</span></div><div><span class="lbl">Useful life</span><span>${a.usefulLife??GROUPS[g].life} years</span></div>`:""}
+    </div>
+    ${!stock?`<div class="qr" title="Scan to open this asset">${qrSvg(APP_URL+"#"+a.code,3)}</div>`:""}
+  </div>
+  <div class="tscroll"><table><thead><tr><th>Purchase cost</th><th>Book value</th><th>Market value</th></tr></thead><tbody><tr>
+    <td class="num">${egp(a.purchasePrice)}${stock?" each":""}</td><td class="num">${stock?"—":egp(bv)}</td><td class="num">${stock?"—":egp(a.marketPrice)}${a.priceLow!=null&&a.priceHigh!=null&&!stock?`<br><small class="muted">${fmt.format(a.priceLow)} – ${fmt.format(a.priceHigh)}</small>`:""}</td></tr></tbody></table></div>
+  ${a.priceNote&&!stock?`<div class="note">${esc(a.priceNote)}</div>`:""}
+  ${a.notes?`<div class="note">${esc(a.notes)}</div>`:""}
+  ${a.disposal?`<div class="note">Disposed ${dfmt(a.disposal.date)} · ${esc(a.disposal.method)}${a.disposal.amount?` · received ${egp(a.disposal.amount)}`:""}${a.disposal.approvedBy?` · approved by ${esc(a.disposal.approvedBy)}`:""}</div>`:""}
+  <div class="actions">
+    <button class="btn sm" data-act="edit-asset" data-id="${id}">Edit</button>
+    ${stock?`<button class="btn sm" data-act="stock-move" data-id="${id}" data-dir="out">Use</button><button class="btn sm" data-act="stock-move" data-id="${id}" data-dir="in">Restock</button>`:""}
+    ${!stock&&s==="available"?`<button class="btn sm" data-act="handover" data-id="${id}">Hand over</button>`:""}
+    ${!stock&&sample&&s!=="disposed"?`<button class="btn sm" data-act="price" data-id="${id}">Update value</button>`:""}
+    ${!stock&&(s==="available"||s==="lost")?`<button class="btn sm" data-act="to-repair" data-id="${id}">Send to repair</button>`:""}
+    ${s==="repair"?`<button class="btn sm" data-act="from-repair" data-id="${id}">Back from repair</button>`:""}
+    ${s!=="custody"&&s!=="disposed"?`<button class="btn sm" data-act="dispose" data-id="${id}">Dispose</button>`:""}
+    ${s!=="custody"?`<button class="btn sm ghost danger" data-act="del-asset" data-id="${id}">Delete</button>`:""}
+  </div>
+  ${stock?`<h3>Recent movements</h3>${movesBlock}`:`<h3>Custody history <span class="muted num">${hist.length}</span></h3>${custodyBlock}
+  <div class="row"><h3>Maintenance log <span class="muted num">${log.length}</span></h3><button class="btn sm" data-act="add-maint" data-id="${id}">Add entry</button></div>${maintBlock}`}`;
+}
+function openDetail(id){ openModal(detailHTML(id),{kind:"asset",id}); }
+
+function openMaintForm(id,mode){
+  const a=asset(id); if(!a||!need()) return;
+  const title=mode==="to"?"Send to repair":mode==="from"?"Back from repair":"Add maintenance entry";
+  openModal(`${head(title+" · "+esc(a.code))}
+  <form class="form" id="mtForm">
+    <div class="field"><label for="mt_date">Date</label><input id="mt_date" type="date" value="${today()}" required></div>
+    <div class="field"><label for="mt_kind">Type</label><select id="mt_kind">${optList(["Repair","Service","Inspection","Warranty claim","Upgrade"].map(k=>[k,k]),mode?"Repair":"Service")}</select></div>
+    <div class="field"><label for="mt_vendor">Vendor or technician</label><input id="mt_vendor"></div>
+    <div class="field"><label for="mt_cost">Cost (EGP)</label><input id="mt_cost" type="number" min="0" inputmode="numeric" placeholder="${mode==="to"?"Fill in when it comes back":""}"></div>
+    ${mode==="from"?`<div class="field"><label for="mt_cond">Condition now</label><select id="mt_cond">${optList(CONDS.map(c=>[c,c]),"Good")}</select></div>`:""}
+    <div class="field full"><label for="mt_notes">${mode==="to"?"What's wrong with it":"What was done"}</label><textarea id="mt_notes" placeholder="${mode==="to"?"e.g. autofocus not working":"e.g. sensor cleaned, firmware updated"}"></textarea></div>
+    <div class="form-actions"><button class="btn primary" type="submit">Save</button><button class="btn ghost" type="button" data-act="asset" data-id="${id}">Cancel</button></div>
+  </form>`);
+  $("mtForm").addEventListener("submit",async e=>{
+    e.preventDefault();
+    const c=$("mt_cost").value;
+    try{
+      await db.collection("maintenance").add({assetId:id,code:a.code,date:$("mt_date").value,kind:$("mt_kind").value,vendor:$("mt_vendor").value.trim(),cost:c===""?null:Number(c),notes:(mode==="to"?"Sent to repair. ":"")+$("mt_notes").value.trim(),createdAt:Date.now()});
+      if(mode==="to") await db.doc("assets/"+id).update({status:"repair"});
+      if(mode==="from") await db.doc("assets/"+id).update({status:"available",condition:$("mt_cond").value});
+      toast("Saved"); openDetail(id);
+    }catch{ toast("Couldn't save"); }
+  });
+}
+function openDispose(id){
+  const a=asset(id); if(!a||!need()) return;
+  openModal(`${head("Dispose of "+esc(a.code))}
+  <div class="note">${esc(a.name)}${isStock(a)?"":" · book value "+egp(bookValue(a))}. Disposed assets stay in the register for the record but leave all totals.</div>
+  <form class="form" id="dpForm">
+    <div class="field"><label for="dp_method">Method</label><select id="dp_method">${optList(["Sold","Scrapped","Written off (lost)","Donated","Returned to supplier"].map(k=>[k,k]),a.status==="lost"?"Written off (lost)":"Sold")}</select></div>
+    <div class="field"><label for="dp_date">Date</label><input id="dp_date" type="date" value="${today()}" required></div>
+    <div class="field"><label for="dp_amount">Amount received (EGP)</label><input id="dp_amount" type="number" min="0" inputmode="numeric"></div>
+    <div class="field"><label for="dp_by">Approved by</label><input id="dp_by" required placeholder="Owner or manager"></div>
+    <div class="field full"><label for="dp_notes">Notes</label><textarea id="dp_notes"></textarea></div>
+    <div class="form-actions"><button class="btn primary" type="submit">Dispose</button><button class="btn ghost" type="button" data-act="asset" data-id="${id}">Cancel</button></div>
+  </form>`);
+  $("dpForm").addEventListener("submit",async e=>{
+    e.preventDefault(); const amt=$("dp_amount").value;
+    try{
+      await db.doc("assets/"+id).update({status:"disposed",kitId:"",disposal:{method:$("dp_method").value,date:$("dp_date").value,amount:amt===""?null:Number(amt),approvedBy:$("dp_by").value.trim(),notes:$("dp_notes").value.trim(),bookValueAtDisposal:bookValue(a)}});
+      toast("Asset disposed"); openDetail(id);
+    }catch{ toast("Couldn't save"); }
+  });
+}
+
+/* ---------- stock ---------- */
+function renderStock(){
+  const items=stockItems().sort((x,y)=>isLow(y)-isLow(x)||String(x.name).localeCompare(y.name));
+  if(!items.length){ $("stockList").innerHTML=`<div class="empty-state"><strong>No stock items yet</strong>Add batteries, gels, tape or backdrop paper with a quantity and a reorder level.</div>`; return; }
+  $("stockList").innerHTML=items.map(a=>`<div class="card">
+    <div class="hd"><span><span class="code">${esc(a.code)}</span> · <button class="link" data-act="asset" data-id="${a.id}">${esc(a.name)}</button></span>${isLow(a)?`<span class="pill s-low">Reorder</span>`:""}</div>
+    <div class="row"><div class="meta"><span class="num qty">${fmt.format(a.qty||0)} ${esc(a.unit||"")}</span>${a.reorderLevel!=null?`<span>Reorder at ${a.reorderLevel}</span>`:""}${loc(a.locationId)?`<span>${esc(loc(a.locationId).name)}</span>`:""}${a.purchasePrice!=null?`<span>${egp(a.purchasePrice)} each</span>`:""}</div>
+    <div class="actions"><button class="btn sm" data-act="stock-move" data-id="${a.id}" data-dir="out">Use</button><button class="btn sm" data-act="stock-move" data-id="${a.id}" data-dir="in">Restock</button></div></div>
+  </div>`).join("");
+}
+function openStockMove(id,dir){
+  const a=asset(id); if(!a||!need()) return;
+  openModal(`${head((dir==="in"?"Restock ":"Use ")+esc(a.name))}
+  <div class="note">On hand now: ${fmt.format(a.qty||0)} ${esc(a.unit||"")}</div>
+  <form class="form" id="smForm">
+    <div class="field"><label for="sm_qty">Quantity</label><input id="sm_qty" type="number" min="1" inputmode="numeric" required></div>
+    <div class="field"><label for="sm_by">By</label><input id="sm_by"></div>
+    <div class="field full"><label for="sm_note">Note</label><input id="sm_note" placeholder="${dir==="in"?"Supplier or invoice":"Shoot or client"}"></div>
+    <div class="form-actions"><button class="btn primary" type="submit">Save</button><button class="btn ghost" type="button" data-act="close">Cancel</button></div>
+  </form>`);
+  $("smForm").addEventListener("submit",async e=>{
+    e.preventDefault(); const n=Number($("sm_qty").value)||0; if(!n) return;
+    const delta=dir==="in"?n:-n, qty=Math.max(0,Number(a.qty||0)+delta);
+    try{
+      await db.doc("assets/"+id).update({qty});
+      await db.collection("stockMoves").add({assetId:id,code:a.code,delta,note:$("sm_note").value.trim(),by:$("sm_by").value.trim(),at:Date.now()});
+      closeModal(); toast(`${a.name}: ${qty} ${a.unit||""} on hand`);
+    }catch{ toast("Couldn't save"); }
+  });
+}
+
+/* ---------- kits ---------- */
+function kitCode(){ const used=new Set(kits.map(k=>k.code)); for(let i=0;i<702;i++){ const l=i<26?String.fromCharCode(65+i):String.fromCharCode(64+Math.floor(i/26))+String.fromCharCode(65+i%26); if(!used.has("PK-KIT-"+l)) return "PK-KIT-"+l; } return "PK-KIT-"+Date.now(); }
+function renderKits(){
+  if(!kits.length){ $("kitList").innerHTML=`<div class="empty-state"><strong>No kits yet</strong>Group production gear that always goes out together, then hand over or count the whole kit in one step.</div>`; return; }
+  $("kitList").innerHTML=kits.slice().sort((x,y)=>String(x.code).localeCompare(y.code)).map(k=>{
+    const items=assets.filter(a=>a.kitId===k.id&&a.status!=="disposed"), out=items.filter(a=>a.status==="custody"), avail=items.filter(a=>a.status==="available");
+    const st=!items.length?"":out.length===items.length?`<span class="pill s-custody">Out</span>`:out.length?`<span class="pill s-partial">Partly out</span>`:`<span class="pill s-available">Available</span>`;
+    return `<div class="card">
+      <div class="hd"><span><span class="code">${esc(k.code)}</span> · <b>${esc(k.name)}</b></span>${st}</div>
+      <div class="meta"><span class="num">${items.length} items · ${egp(sum(items,a=>a.marketPrice))}</span>${k.notes?`<span>${esc(k.notes)}</span>`:""}${out.length&&person(out[0].holderId)?`<span>With <button class="link" data-act="profile" data-pid="${out[0].holderId}">${esc(person(out[0].holderId).name)}</button></span>`:""}</div>
+      <div class="meta">${items.map(a=>`<span><button class="link" data-act="asset" data-id="${a.id}">${esc(a.name)}</button>${a.status!=="available"?` <span class="pill s-${a.status}">${STATUS[a.status]}</span>`:""}</span>`).join("")||"No items yet"}</div>
+      <div class="actions">${avail.length?`<button class="btn sm" data-act="handover" data-kid="${k.id}">Hand over kit</button>`:""}${items.length?`<button class="btn sm" data-act="count" data-kind="kit" data-sid="${k.id}">Count</button>`:""}<button class="btn sm" data-act="edit-kit" data-kid="${k.id}">Edit</button></div>
+    </div>`;
+  }).join("");
+}
+function openKitForm(kid){
+  if(!need()) return;
+  const k=kid?kit(kid):{code:kitCode(),name:"",notes:""};
+  const pool=assets.filter(a=>groupOf(a)==="kit"&&a.status!=="disposed"&&(!a.kitId||(kid&&a.kitId===kid)||!kit(a.kitId)));
+  openModal(`${head(kid?"Edit kit "+esc(k.code):"New kit")}
+  <form class="form" id="kitForm">
+    <div class="field"><label for="kit_code">Code</label><input id="kit_code" value="${esc(k.code)}" disabled class="mono"></div>
+    <div class="field"><label for="kit_name">Name</label><input id="kit_name" required value="${esc(k.name)}" placeholder="e.g. Camera Kit A, Interview audio kit"></div>
+    <div class="field full"><span class="lbl">Items</span>
+      ${pool.length?`<div class="picklist">${pool.map(a=>`<label class="pick"><input type="checkbox" value="${a.id}"${kid&&a.kitId===kid?" checked":""}><span><b>${esc(a.name)}</b><br><small class="mono">${esc(a.code)} · ${esc(a.serial||"no serial")}</small></span><small class="num">${egp(a.marketPrice)}</small></label>`).join("")}</div>`:`<div class="note">Add production kit assets first. Only items not already in another kit are listed.</div>`}
+    </div>
+    <div class="field full"><label for="kit_notes">Notes</label><input id="kit_notes" value="${esc(k.notes)}" placeholder="e.g. Pelican case 1"></div>
+    <div class="form-actions"><button class="btn primary" type="submit">Save kit</button><button class="btn ghost" type="button" data-act="close">Cancel</button>${kid?`<button class="btn ghost danger" type="button" data-act="del-kit" data-kid="${kid}">Delete kit</button>`:""}</div>
+  </form>`);
+  $("kitForm").addEventListener("submit",async e=>{
+    e.preventDefault();
+    const chosen=new Set([...$("kitForm").querySelectorAll(".pick input:checked")].map(i=>i.value));
+    try{
+      let id=kid;
+      if(kid) await db.doc("kits/"+kid).update({name:$("kit_name").value.trim(),notes:$("kit_notes").value.trim()});
+      else id=(await db.collection("kits").add({code:k.code,name:$("kit_name").value.trim(),notes:$("kit_notes").value.trim(),createdAt:Date.now()})).id;
+      for(const a of pool){ const want=chosen.has(a.id); if(want&&a.kitId!==id) await db.doc("assets/"+a.id).update({kitId:id}); if(!want&&a.kitId===id) await db.doc("assets/"+a.id).update({kitId:""}); }
+      closeModal(); toast("Kit saved");
+    }catch{ toast("Couldn't save the kit"); }
+  });
+}
+
+/* ---------- people ---------- */
+function holdings(pid){ return assets.filter(a=>a.status==="custody"&&a.holderId===pid); }
+function openPersonForm(id){
+  if(!need()) return;
+  const p=id?person(id):{code:nextNo(people.map(x=>x.code),"EMP-")};
+  openModal(head(id?"Edit employee":"Add employee")+`<form class="form" id="personForm">
+  <div class="field"><label for="p_code">Employee ID (same as HR)</label><input id="p_code" class="mono" value="${esc(p.code)}" required></div>
+  <div class="field"><label for="p_name">Full name</label><input id="p_name" value="${esc(p.name)}" required></div>
+  <div class="field"><label for="p_title">Job title</label><input id="p_title" value="${esc(p.title)}"></div>
+  <div class="field"><label for="p_dept">Department</label><input id="p_dept" value="${esc(p.dept)}"></div>
+  <div class="field"><label for="p_phone">Phone</label><input id="p_phone" type="tel" value="${esc(p.phone)}"></div>
+  <div class="field"><label for="p_email">Email</label><input id="p_email" type="email" value="${esc(p.email)}"></div>
+  <div class="field"><label for="p_nid">National ID</label><input id="p_nid" class="mono" inputmode="numeric" value="${esc(p.nid)}"></div>
+  <div class="field"><label for="p_hire">Hire date</label><input id="p_hire" type="date" value="${esc(p.hireDate)}"></div>
+  <div class="field"><label for="p_status">Status</label><select id="p_status">${optList([["active","Active"],["leaving","Leaving (clearance in progress)"],["left","Left the company"]],p.status||"active")}</select></div>
+  <div class="field"><label for="p_policy">Asset use policy signed on</label><input id="p_policy" type="date" value="${esc(p.policySigned)}"></div>
+  <div class="field full"><label for="p_notes">Notes</label><textarea id="p_notes">${esc(p.notes)}</textarea></div>
+  <div class="form-actions"><button class="btn primary" type="submit">Save</button><button class="btn ghost" type="button" data-act="close">Cancel</button></div>
+  </form>`);
+  $("personForm").addEventListener("submit",async e=>{
+    e.preventDefault();
+    const d={code:$("p_code").value.trim(),name:$("p_name").value.trim(),title:$("p_title").value.trim(),dept:$("p_dept").value.trim(),phone:$("p_phone").value.trim(),email:$("p_email").value.trim(),nid:$("p_nid").value.trim(),hireDate:$("p_hire").value,status:$("p_status").value,policySigned:$("p_policy").value,notes:$("p_notes").value.trim()};
+    if(people.some(x=>x.code===d.code && x.id!==id)){ toast("Another employee already has ID "+d.code); return; }
+    try{
+      if(id){ await db.doc("employees/"+id).update(d); openProfile(id); } else { await db.collection("employees").add({...d,createdAt:Date.now()}); closeModal(); }
+      toast("Employee saved");
+    }catch{ toast("Couldn't save the employee"); }
+  });
+}
+function renderPeople(){
+  const q=pQuery.toLowerCase(), rank={active:0,leaving:1,left:2};
+  const shown=people.filter(p=>!q||[p.name,p.code,p.dept,p.title,p.phone].some(v=>String(v||"").toLowerCase().includes(q)))
+    .sort((a,b)=>(rank[a.status]||0)-(rank[b.status]||0)||String(a.name).localeCompare(b.name));
+  if(!people.length){ $("peopleList").innerHTML=`<div class="empty-state"><strong>No employees yet</strong>Add the people who take equipment out or use company laptops and phones.</div>`; return; }
+  if(!shown.length){ $("peopleList").innerHTML=`<div class="empty-state">No employee matches "${esc(pQuery)}".</div>`; return; }
+  $("peopleList").innerHTML=shown.map(p=>{
+    const h=holdings(p.id), od=custody.some(c=>c.employeeId===p.id&&isOverdue(c));
+    return `<button class="person" type="button" data-act="profile" data-pid="${p.id}">
+      <span class="avatar">${esc(initials(p.name))}</span>
+      <span style="min-width:0"><b style="font-family:var(--f-display)">${esc(p.name)}</b> <span class="code">${esc(p.code)}</span><br>
+      <span class="meta">${esc([p.title,p.dept].filter(Boolean).join(" · ")||"—")}${p.status==="leaving"?` <span class="pill s-due">Leaving</span>`:p.status==="left"?` <span class="pill s-disposed">Left</span>`:""}${od?` <span class="pill s-overdue">Overdue</span>`:""}${!p.policySigned&&p.status!=="left"?` <span class="pill">Policy not signed</span>`:""}</span></span>
+      <span class="r">${h.length?`<b class="num">${h.length} item${h.length>1?"s":""}</b>${egp(sum(h,a=>a.marketPrice))}`:"Holds nothing"}</span>
+    </button>`;
+  }).join("");
+}
+$("qPeople").addEventListener("input",e=>{pQuery=e.target.value.trim();renderPeople()});
+
+function profileHTML(pid){
+  const p=person(pid); if(!p) return head("Employee")+`<div class="empty-state">This employee was removed.</div>`;
+  const h=holdings(pid);
+  const recs=custody.filter(c=>c.employeeId===pid).sort((a,b)=>b.outAt-a.outAt);
+  const bad=recs.flatMap(c=>c.items.filter(i=>i.conditionIn==="Missing"||i.conditionIn==="Damaged").map(i=>({...i,no:c.no})));
+  return `${head(esc(p.name))}
+  <div class="dl">
+    <div><span class="lbl">Employee ID</span><span class="mono">${esc(p.code)}</span></div>
+    <div><span class="lbl">Job title</span><span>${esc(p.title||"—")}</span></div>
+    <div><span class="lbl">Department</span><span>${esc(p.dept||"—")}</span></div>
+    <div><span class="lbl">Status</span><span>${{active:"Active",leaving:"Leaving",left:"Left the company"}[p.status||"active"]}${p.clearance?.clearedAt?` · cleared ${dfmt(p.clearance.clearedAt)}`:""}</span></div>
+    <div><span class="lbl">Phone</span><span class="mono">${esc(p.phone||"—")}</span></div>
+    <div><span class="lbl">Email</span><span>${esc(p.email||"—")}</span></div>
+    <div><span class="lbl">National ID</span><span class="mono">${esc(p.nid||"—")}</span></div>
+    <div><span class="lbl">Hire date</span><span>${dfmt(p.hireDate)}</span></div>
+    <div><span class="lbl">Asset policy signed</span><span>${p.policySigned?dfmt(p.policySigned):"Not yet"}</span></div>
+  </div>
+  ${p.notes?`<div class="note">${esc(p.notes)}</div>`:""}
+  <div class="actions">
+    ${p.status!=="left"?`<button class="btn primary sm" data-act="handover" data-pid="${pid}">Hand over assets</button>`:""}
+    ${h.length?`<button class="btn sm" data-act="statement" data-pid="${pid}">Print custody statement</button>`:""}
+    <button class="btn sm" data-act="clearance" data-pid="${pid}">Clearance</button>
+    <button class="btn sm" data-act="edit-person" data-pid="${pid}">Edit details</button>
+    ${!recs.length?`<button class="btn sm ghost danger" data-act="del-person" data-pid="${pid}">Delete employee</button>`:""}
+  </div>
+  <h3>Currently holding <span class="muted num">${h.length} · ${egp(sum(h,a=>a.marketPrice))}</span></h3>
+  ${h.length?`<div class="tscroll"><table><thead><tr><th>Code</th><th>Asset</th><th>Serial</th><th>Type</th><th>Since</th><th class="r">Value</th></tr></thead><tbody>
+    ${h.map(a=>{const c=custody.find(x=>x.id===a.custodyId);return `<tr><td class="mono">${esc(a.code)}</td><td><button class="link" data-act="asset" data-id="${a.id}">${esc(a.name)}</button></td><td class="mono">${esc(a.serial||"—")}</td><td>${c?CTYPES[c.type||"shoot"]:"—"}</td><td>${dfmt(c?.outAt)}${c&&isOverdue(c)?` <span class="pill s-overdue">Overdue</span>`:""}</td><td class="r num">${egp(a.marketPrice)}</td></tr>`}).join("")}
+  </tbody></table></div>`:`<div class="note">Nothing in custody right now.</div>`}
+  ${bad.length?`<h3>Damaged or missing on return</h3><div class="tscroll"><table><thead><tr><th>Record</th><th>Asset</th><th>Result</th><th class="r">Value</th></tr></thead><tbody>${bad.map(i=>`<tr><td class="mono">${esc(i.no)}</td><td>${esc(i.name)}</td><td><span class="pill ${i.conditionIn==="Missing"?"s-lost":"s-repair"}">${esc(i.conditionIn)}</span></td><td class="r num">${egp(i.value)}</td></tr>`).join("")}</tbody></table></div>`:""}
+  <h3>Custody history <span class="muted num">${recs.length}</span></h3>
+  ${recs.length?`<div class="list">${recs.map(c=>custodyCard(c,true)).join("")}</div>`:`<div class="note">No handovers yet.</div>`}`;
+}
+function openProfile(pid){ openModal(profileHTML(pid),{kind:"profile",id:pid}); }
+
+function clearanceHTML(pid){
+  const p=person(pid); if(!p) return head("Clearance");
+  const h=holdings(pid), cl=p.clearance||{}, checks=cl.checks||{};
+  const openRecs=custody.filter(c=>c.employeeId===pid&&c.status!=="closed");
+  const ready=!h.length&&CLEAR_CHECKS.every(([k])=>checks[k]);
+  return `${head("Clearance · "+esc(p.name))}
+  ${cl.clearedAt?`<div><span class="pill s-ok">Cleared ${dfmt(cl.clearedAt)}${cl.by?` by ${esc(cl.by)}`:""}</span></div>`:`<div class="note">Everything below must be done before the employee's final settlement.</div>`}
+  <h3>1. Assets still out <span class="muted num">${h.length}</span></h3>
+  ${openRecs.length?`<div class="list">${openRecs.map(c=>custodyCard(c,true)).join("")}</div>`:`<div class="note">Nothing outstanding.</div>`}
+  <h3>2. Checklist</h3>
+  <div class="checks">${CLEAR_CHECKS.map(([k,l])=>`<label><input type="checkbox" data-clr="${k}" data-pid="${pid}"${checks[k]?" checked":""}${cl.clearedAt?" disabled":""}> ${esc(l)}</label>`).join("")}</div>
+  <div class="actions">
+    ${cl.clearedAt?"":`<input class="search" id="clr_by" placeholder="Cleared by" style="width:180px"><button class="btn primary" data-act="clear-done" data-pid="${pid}"${ready?"":" disabled"}>Mark as cleared</button>`}
+    <button class="btn" data-act="clear-form" data-pid="${pid}">Print clearance form</button>
+    <button class="btn ghost" data-act="profile" data-pid="${pid}">Back to profile</button>
+  </div>
+  ${!ready&&!cl.clearedAt?`<div class="note">${h.length?"Receive every asset back first. ":""}${CLEAR_CHECKS.some(([k])=>!checks[k])?"Tick every checklist item.":""}</div>`:""}`;
+}
+function openClearance(pid){ openModal(clearanceHTML(pid),{kind:"clearance",id:pid}); }
+document.addEventListener("change",async e=>{
+  const c=e.target.closest("input[data-clr]"); if(!c||!need()) return;
+  const p=person(c.dataset.pid); const cl={...(p.clearance||{})}; cl.checks={...(cl.checks||{}),[c.dataset.clr]:c.checked};
+  try{ await db.doc("employees/"+p.id).update({clearance:cl,status:p.status==="active"?"leaving":p.status}); }catch{ toast("Couldn't save"); }
+});
+
+/* ---------- handover ---------- */
+function openHandover({employeeId="",assetIds=[],kitId=""}={}){
+  if(!need()) return;
+  const active=people.filter(p=>p.status!=="left");
+  if(!active.length){ toast("Add the employee first"); show("people"); openPersonForm(); return; }
+  const avail=assets.filter(a=>!isStock(a)&&(a.status||"available")==="available");
+  if(!avail.length){ toast("No available assets to hand over"); return; }
+  const sel=new Set(assetIds); if(kitId) avail.filter(a=>a.kitId===kitId).forEach(a=>sel.add(a.id));
+  const first=asset([...sel][0]);
+  const defType=first&&(groupOf(first)==="it"||groupOf(first)==="office")?"assignment":"shoot";
+  const kitBtns=kits.filter(k=>avail.some(a=>a.kitId===k.id));
+  openModal(`${head("Hand over assets")}
+  <form class="form" id="hoForm">
+    <div class="field full"><span class="lbl">Handover type</span><div class="radios">
+      <label><input type="radio" name="ho_type" value="shoot"${defType==="shoot"?" checked":""}> Shoot check-out (comes back after the shoot)</label>
+      <label><input type="radio" name="ho_type" value="assignment"${defType==="assignment"?" checked":""}> Long-term assignment (laptop, phone)</label></div></div>
+    <div class="field"><label for="ho_emp">Employee</label><select id="ho_emp" required>${optList([["","Choose…"],...active.map(p=>[p.id,`${p.name} (${p.code})`])],employeeId)}</select></div>
+    <div class="field" id="ho_dueF"><label for="ho_due">Return by</label><input id="ho_due" type="date" min="${today()}"></div>
+    <div class="field full"><label for="ho_purpose">Purpose</label><input id="ho_purpose" placeholder="e.g. Shoot for Client X, 22–23 Oct, Zamalek"></div>
+    <div class="field full"><span class="lbl">Assets <span id="ho_count" class="num"></span></span>
+      ${kitBtns.length?`<div class="chips" style="margin-block:6px">${kitBtns.map(k=>`<button class="chip" type="button" data-kitadd="${k.id}">+ ${esc(k.code)} ${esc(k.name)}</button>`).join("")}</div>`:""}
+      <input class="search" id="ho_q" type="search" placeholder="Filter" style="width:100%;margin-block:6px">
+      <div class="picklist" id="ho_list">${avail.map(a=>`<label class="pick" data-name="${esc([a.name,a.code,a.serial,kit(a.kitId)?.code].join(" ").toLowerCase())}"><input type="checkbox" value="${a.id}" data-kit="${a.kitId||""}"${sel.has(a.id)?" checked":""}><span><b>${esc(a.name)}</b><br><small class="mono">${esc(a.code)} · ${esc(a.serial||"no serial")}${kit(a.kitId)?" · "+esc(kit(a.kitId).code):""}</small></span><small class="num">${egp(a.marketPrice)}</small></label>`).join("")}</div>
+    </div>
+    <div class="field"><label for="ho_by">Handed over by</label><input id="ho_by" placeholder="Your name"></div>
+    <div class="field"><label for="ho_notes">Condition notes</label><input id="ho_notes" placeholder="e.g. small scratch on lens hood"></div>
+    <div class="note full">After saving, print the form, have the employee sign the paper copy, then attach a photo of it to the record.</div>
+    <div class="err full" id="ho_err" hidden></div>
+    <div class="form-actions"><button class="btn primary" type="submit" id="ho_save" disabled>Save handover</button><button class="btn ghost" type="button" data-act="close">Cancel</button></div>
+  </form>`);
+  const f=$("hoForm");
+  const upd=()=>{ const n=f.querySelectorAll("#ho_list input:checked").length; $("ho_count").textContent=n?`(${n} selected)`:""; $("ho_save").disabled=!($("ho_emp").value&&n); $("ho_dueF").hidden=f.querySelector("input[name=ho_type]:checked").value!=="shoot"; };
+  f.addEventListener("change",upd);
+  f.addEventListener("click",e=>{ const k=e.target.closest("[data-kitadd]"); if(k){ f.querySelectorAll(`#ho_list input[data-kit="${k.dataset.kitadd}"]`).forEach(i=>i.checked=true); upd(); } });
+  $("ho_q").addEventListener("input",e=>{const q=e.target.value.toLowerCase(); f.querySelectorAll("#ho_list .pick").forEach(l=>l.hidden=!!q&&!l.dataset.name.includes(q));});
+  upd();
+  f.addEventListener("submit",async e=>{
+    e.preventDefault(); $("ho_save").disabled=true;
+    const emp=person($("ho_emp").value), type=f.querySelector("input[name=ho_type]:checked").value;
+    const ids=[...f.querySelectorAll("#ho_list input:checked")].map(i=>i.value);
+    const items=ids.map(asset).filter(Boolean).map(a=>({assetId:a.id,code:a.code||"",name:a.name,serial:a.serial||"",value:a.marketPrice??null,conditionOut:a.condition||"",accessories:a.notes||"",kit:kit(a.kitId)?.code||"",returnedAt:null,conditionIn:""}));
+    try{
+      const now=Date.now();
+      const ref=await db.collection("custody").add({no:nextNo(custody.map(c=>c.no),"CUS-"),type,employeeId:emp.id,employeeName:emp.name,employeeCode:emp.code,
+        purpose:$("ho_purpose").value.trim(),dueAt:type==="shoot"?($("ho_due").value||null):null,issuedBy:$("ho_by").value.trim(),outNotes:$("ho_notes").value.trim(),
+        terms:TERMS,signedScans:[],items,returns:[],status:"open",outAt:now,createdAt:now});
+      for(const it of items) await db.doc("assets/"+it.assetId).update({status:"custody",holderId:emp.id,custodyId:ref.id});
+      closeModal(); toast(`Handed ${items.length} item${items.length>1?"s":""} to ${emp.name}. Print the form to sign.`); cFilter="active"; show("custody");
+    }catch{ setErr("ho_err","Couldn't save the handover. Try again."); $("ho_save").disabled=false; }
+  });
+}
+
+/* ---------- return ---------- */
+function openReturn(cid){
+  if(!need()) return;
+  const c=custody.find(x=>x.id===cid); if(!c) return;
+  const open=c.items.filter(i=>!i.returnedAt);
+  if(!open.length){ toast("Everything on this record is already back"); return; }
+  openModal(`${head("Receive back · "+esc(c.no))}
+  <div class="note">From ${esc(c.employeeName)} · ${CTYPES[c.type||"shoot"]} · handed over ${dfmt(c.outAt)}${c.purpose?" · "+esc(c.purpose):""}</div>
+  <form class="form" id="rtForm">
+    <div class="full tscroll"><table><thead><tr><th></th><th>Asset</th><th>Returned as</th></tr></thead><tbody>
+      ${open.map(i=>`<tr><td><input type="checkbox" checked data-aid="${i.assetId}" aria-label="Returned"></td><td>${esc(i.name)}<br><small class="mono muted">${esc(i.code)} · ${esc(i.serial||"no serial")}</small></td>
+      <td><select data-cond="${i.assetId}" aria-label="Condition on return"><option>Good</option><option>Damaged</option><option>Missing</option></select></td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="field"><label for="rt_by">Received by</label><input id="rt_by" placeholder="Your name"></div>
+    <div class="field"><label for="rt_notes">Notes</label><input id="rt_notes" placeholder="e.g. battery missing"></div>
+    <div class="note full">Good returns go back to Available. Damaged goes to Under repair with a maintenance entry, Missing goes to Lost, and both stay on the employee's record.</div>
+    <div class="form-actions"><button class="btn primary" type="submit">Save return</button><button class="btn ghost" type="button" data-act="close">Cancel</button></div>
+  </form>`);
+  $("rtForm").addEventListener("submit",async e=>{
+    e.preventDefault();
+    const f=$("rtForm"), now=Date.now(), note=$("rt_notes").value.trim();
+    const back=[...f.querySelectorAll("input[data-aid]:checked")].map(i=>({assetId:i.dataset.aid,cond:f.querySelector(`[data-cond="${i.dataset.aid}"]`).value}));
+    if(!back.length){ toast("Tick at least one item"); return; }
+    const items=c.items.map(i=>{const r=back.find(x=>x.assetId===i.assetId); return r?{...i,returnedAt:now,conditionIn:r.cond}:i;});
+    const status=items.every(i=>i.returnedAt)?"closed":"partial";
+    try{
+      await db.doc("custody/"+cid).update({items,status,returns:[...(c.returns||[]),{at:now,receivedBy:$("rt_by").value.trim(),notes:note,assetIds:back.map(b=>b.assetId)}]});
+      for(const r of back){
+        await db.doc("assets/"+r.assetId).update({status:r.cond==="Good"?"available":r.cond==="Damaged"?"repair":"lost",holderId:null,custodyId:null});
+        if(r.cond==="Damaged") await db.collection("maintenance").add({assetId:r.assetId,code:asset(r.assetId)?.code||"",date:today(),kind:"Repair",vendor:"",cost:null,notes:`Returned damaged on ${c.no} by ${c.employeeName}. ${note}`.trim(),createdAt:now});
+      }
+      closeModal(); toast(status==="closed"?"All items received. Record closed.":"Items received");
+    }catch{ toast("Couldn't save the return"); }
+  });
+}
+
+/* ---------- custody list ---------- */
+function custodyCard(c,compact){
+  const st=isOverdue(c)?"overdue":c.status, val=sum(c.items,i=>i.value), out=c.items.filter(i=>!i.returnedAt).length;
+  const label={open:"Open",partial:"Partly returned",closed:"Closed",overdue:"Overdue"}[st];
+  const fid=`scan-${c.id}${compact?"-m":""}`;
+  return `<div class="card">
+    <div class="hd"><span><span class="code">${esc(c.no)}</span> · ${compact?"":`<button class="link" data-act="profile" data-pid="${c.employeeId}">${esc(c.employeeName)}</button> · `}${dfmt(c.outAt)}</span><span><span class="pill">${CTYPES[c.type||"shoot"]}</span> <span class="pill s-${st}">${label}</span></span></div>
+    ${c.purpose?`<div>${esc(c.purpose)}</div>`:""}
+    ${!(c.signedScans||[]).length?`<div class="meta"><span class="pill s-repair">Signed copy not attached</span></div>`:""}
+    <div class="meta"><span class="num">${c.items.length} item${c.items.length>1?"s":""} · ${egp(val)}</span>${c.dueAt&&c.type!=="assignment"?`<span>Due ${dfmt(c.dueAt)}</span>`:""}${c.type==="assignment"?`<span>Returned on leaving</span>`:""}${out&&c.status!=="open"?`<span>${out} still out</span>`:""}</div>
+    <div class="meta">${c.items.map(i=>`<span>${esc(i.name)}${i.returnedAt?` ✓${i.conditionIn&&i.conditionIn!=="Good"?" ("+esc(i.conditionIn)+")":""}`:""}</span>`).join("")}</div>
+    <div class="actions">${c.status!=="closed"?`<button class="btn sm" data-act="return" data-cid="${c.id}">Receive back</button>`:""}<button class="btn sm" data-act="form" data-cid="${c.id}">Print form</button>${store?`<label class="btn sm" for="${fid}">Attach signed copy</label><input id="${fid}" data-signed="${c.id}" type="file" accept="image/*,application/pdf" capture="environment" hidden>`:""}${(c.signedScans||[]).map((id,i)=>`<a class="link" href="${BLOB}${esc(id)}" target="_blank" rel="noopener">Signed copy ${i+1}</a>`).join("")}</div>
+  </div>`;
+}
+function renderCustody(){
+  const f={active:c=>c.status!=="closed",overdue:isOverdue,unsigned:c=>!(c.signedScans||[]).length,closed:c=>c.status==="closed",all:()=>true};
+  const labels={active:"Active",overdue:"Overdue",unsigned:"Not signed",closed:"Closed",all:"All"};
+  $("custodyChips").innerHTML=Object.keys(f).map(k=>`<button class="chip" type="button" data-cf="${k}" aria-pressed="${k===cFilter}">${labels[k]} <span class="num">${custody.filter(f[k]).length}</span></button>`).join("");
+  const shown=custody.filter(f[cFilter]).sort((a,b)=>b.outAt-a.outAt);
+  if(!custody.length){ $("custodyList").innerHTML=`<div class="empty-state"><strong>No handovers yet</strong>When an employee takes equipment out or gets a laptop, tap "New handover" and tick the items.</div>`; return; }
+  $("custodyList").innerHTML=shown.length?shown.map(c=>custodyCard(c)).join(""):`<div class="empty-state">Nothing here.</div>`;
+}
+$("custodyChips").addEventListener("click",e=>{const c=e.target.closest("[data-cf]");if(c){cFilter=c.dataset.cf;renderCustody()}});
+document.addEventListener("change",async e=>{
+  const inp=e.target.closest("input[data-signed]"); if(!inp||!inp.files.length) return;
+  const cid=inp.dataset.signed, f=inp.files[0]; inp.value="";
+  const c=custody.find(x=>x.id===cid); if(!c) return;
+  try{
+    const blob=f.type==="application/pdf"?f:await shrink(f);
+    const up=await store.upload(blob,{type:blob.type||"image/jpeg"});
+    await db.doc("custody/"+cid).update({signedScans:[...(c.signedScans||[]),up.id]});
+    toast("Signed copy attached");
+  }catch{ toast("Couldn't attach the file. Try a JPG, PNG or PDF."); }
+});
+
+/* ---------- counts ---------- */
+function lastCount(kind,id){ return counts.filter(c=>c.scope?.kind===kind&&c.scope?.id===id).sort((a,b)=>b.at-a.at)[0]; }
+function countsDue(){ return ["studio","kit","it","office"].filter(g=>assets.some(a=>groupOf(a)===g&&a.status!=="disposed")).filter(g=>{const l=lastCount("group",g); return !l||addDays(l.at,GROUPS[g].every)<=today();}); }
+function renderCounts(){
+  $("countSchedule").innerHTML=["studio","kit","it","office"].map(g=>{
+    const n=assets.filter(a=>groupOf(a)===g&&a.status!=="disposed").length, l=lastCount("group",g), due=l?addDays(l.at,GROUPS[g].every):null;
+    const st=!n?"":!l?`<span class="pill s-due">Never counted</span>`:due<today()?`<span class="pill s-overdue">Overdue</span>`:due===today()?`<span class="pill s-due">Due today</span>`:`<span class="pill s-ok">On track</span>`;
+    const ev=GROUPS[g].every; const every=ev>=365?"Year":ev>=180?"6 months":ev>=90?"3 months":"Month";
+    return `<tr><td>${GROUPS[g].label} <span class="muted num">(${n})</span></td><td>${every}</td><td>${l?dfmt(l.at):"—"}</td><td>${due?dfmt(due):"—"} ${st}</td><td class="r">${n?`<button class="btn sm" data-act="count" data-kind="group" data-sid="${g}">Count</button>`:""}</td></tr>`;
+  }).join("");
+  const ls=$("countLoc"), ks=$("countKit");
+  if(document.activeElement!==ls){ const v=ls.value; ls.innerHTML=locations.length?optList(locations.map(l=>[l.id,l.name]),v):`<option value="">Add locations in Setup</option>`; }
+  if(document.activeElement!==ks){ const v=ks.value; ks.innerHTML=kits.length?optList(kits.map(k=>[k.id,k.code+" · "+k.name]),v):`<option value="">No kits yet</option>`; }
+  const hist=counts.slice().sort((a,b)=>b.at-a.at);
+  $("countList").innerHTML=hist.length?hist.map(c=>{
+    const miss=(c.missing||[]).map(m=>({...m,a:asset(m.id)}));
+    return `<div class="card"><div class="hd"><span><b>${esc(c.scope?.label||"")}</b> · ${dfmt(c.at)}${c.by?` · ${esc(c.by)}`:""}</span><span class="pill ${miss.length?"s-lost":"s-ok"}">${miss.length?miss.length+" missing":"All found"}</span></div>
+      <div class="meta"><span class="num">${(c.found||[]).length} found of ${c.expected}</span>${(c.out||[]).length?`<span class="num">${c.out.length} out with employees</span>`:""}${c.notes?`<span>${esc(c.notes)}</span>`:""}</div>
+      ${miss.length?`<div class="meta">${miss.map(m=>`<span><button class="link" data-act="asset" data-id="${m.id}">${esc(m.code)} ${esc(m.name)}</button>${m.a&&m.a.status!=="lost"&&m.a.status!=="disposed"?` <button class="btn sm" data-act="mark-lost" data-id="${m.id}">Mark lost</button>`:m.a?` <span class="pill s-${m.a.status}">${STATUS[m.a.status]}</span>`:""}</span>`).join("")}</div>`:""}
+    </div>`;
+  }).join(""):`<div class="empty-state"><strong>No counts yet</strong>Pick a group, room or kit, walk through it, and tick what you find. Anything not ticked is listed as missing.</div>`;
+}
+function openCount(kind,id){
+  if(!need()||!id) return;
+  const label=kind==="group"?GROUPS[id].label:kind==="location"?(loc(id)?.name||"Location"):(kit(id)?`${kit(id).code} · ${kit(id).name}`:"Kit");
+  const exp=assets.filter(a=>!isStock(a)&&a.status!=="disposed"&&(kind==="group"?groupOf(a)===id:kind==="location"?a.locationId===id:a.kitId===id));
+  if(!exp.length){ toast("Nothing to count here yet"); return; }
+  openModal(`${head("Count · "+esc(label))}
+  <div class="note">Tick each item you can see. Items out with an employee are already accounted for.</div>
+  <form class="form" id="ctForm">
+    <div class="full row"><span class="lbl" id="ct_n"></span><button class="btn sm" type="button" id="ct_all">Tick all</button></div>
+    <div class="picklist full" style="max-height:none">${exp.map(a=>{const out=a.status==="custody"; const h=person(a.holderId);
+      return `<label class="pick${out?" off":""}"><input type="checkbox" value="${a.id}"${out?" disabled":""}><span><b>${esc(a.name)}</b><br><small class="mono">${esc(a.code)} · ${esc(a.serial||"no serial")}${loc(a.locationId)&&kind!=="location"?" · "+esc(loc(a.locationId).name):""}</small></span><small>${out?`Out with ${esc(h?.name||"employee")}`:a.status==="lost"?"Marked lost":a.status==="repair"?"Under repair":""}</small></label>`;}).join("")}</div>
+    <div class="field"><label for="ct_by">Counted by</label><input id="ct_by"></div>
+    <div class="field"><label for="ct_notes">Notes</label><input id="ct_notes"></div>
+    <div class="form-actions"><button class="btn primary" type="submit">Save count</button><button class="btn ghost" type="button" data-act="close">Cancel</button></div>
+  </form>`);
+  const f=$("ctForm"), boxes=[...f.querySelectorAll("input[type=checkbox]:not([disabled])")];
+  const upd=()=>$("ct_n").textContent=`${boxes.filter(b=>b.checked).length} of ${boxes.length} ticked`;
+  f.addEventListener("change",upd); $("ct_all").addEventListener("click",()=>{boxes.forEach(b=>b.checked=true);upd();}); upd();
+  f.addEventListener("submit",async e=>{
+    e.preventDefault();
+    const found=boxes.filter(b=>b.checked).map(b=>b.value), missing=boxes.filter(b=>!b.checked).map(b=>asset(b.value)).filter(Boolean);
+    const out=exp.filter(a=>a.status==="custody").map(a=>a.id);
+    try{
+      await db.collection("counts").add({scope:{kind,id,label},at:Date.now(),by:$("ct_by").value.trim(),notes:$("ct_notes").value.trim(),expected:exp.length,found,out,missing:missing.map(a=>({id:a.id,code:a.code,name:a.name}))});
+      for(const fid of found){ if(asset(fid)?.status==="lost") await db.doc("assets/"+fid).update({status:"available"}); }
+      closeModal(); show("counts"); toast(missing.length?`${missing.length} item${missing.length>1?"s":""} missing`:"Everything found");
+    }catch{ toast("Couldn't save the count"); }
+  });
+}
+
+/* ---------- setup ---------- */
+function renderSetup(){
+  if(document.activeElement!==$("setCompany")) $("setCompany").value=settings.company||"";
+  if(document.activeElement!==$("setThreshold")) $("setThreshold").value=settings.threshold??"";
+  $("locList").innerHTML=locations.length?locations.slice().sort((a,b)=>String(a.name).localeCompare(b.name)).map(l=>{const n=assets.filter(a=>a.locationId===l.id&&a.status!=="disposed").length;
+    return `<div class="card"><div class="hd"><b>${esc(l.name)}</b><span class="actions"><span class="muted num">${n} asset${n===1?"":"s"}</span>${n?`<button class="btn sm" data-act="count" data-kind="location" data-sid="${l.id}">Count</button>`:""}<button class="btn sm ghost danger" data-act="del-loc" data-lid="${l.id}">Remove</button></span></div></div>`}).join("")
+    :`<div class="note">No locations yet. Add your studio, offices and storeroom so every asset has a home.</div>`;
+}
+async function saveSetting(k,v){ if(!need()) return; try{ await db.doc("settings/main").set({...settings,[k]:v}); toast("Saved"); }catch{ toast("Couldn't save"); } }
+$("setCompany").addEventListener("change",e=>saveSetting("company",e.target.value.trim()));
+$("setThreshold").addEventListener("change",e=>saveSetting("threshold",e.target.value===""?null:Number(e.target.value)));
+$("locForm").addEventListener("submit",async e=>{ e.preventDefault(); if(!need()) return; const n=$("locName").value.trim(); if(!n) return; try{ await db.collection("locations").add({name:n,createdAt:Date.now()}); $("locName").value=""; toast("Location added"); }catch{ toast("Couldn't add"); } });
+
+/* ---------- printable documents ---------- */
+const DOC_CSS=`body{font-family:Helvetica,Arial,sans-serif;color:#111;max-width:780px;margin:32px auto;padding:0 24px;font-size:13px;line-height:1.5}
+h1{font-size:20px;margin:0}h2{font-size:13px;margin:22px 0 6px;text-transform:uppercase;letter-spacing:.05em;color:#444}
+.head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:14px}
+table{border-collapse:collapse;width:100%}th,td{border:1px solid #bbb;padding:6px 8px;text-align:left;vertical-align:top}th{background:#f1f1f1;font-size:11px;text-transform:uppercase}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px}.mono{font-family:Menlo,Consolas,monospace}
+.sig{display:flex;gap:32px;margin-top:24px}.sig div{flex:1}.line{border-top:1px solid #111;padding-top:4px;margin-top:48px;font-size:11px;color:#444}
+ol{padding-left:18px}.box{display:inline-block;width:12px;height:12px;border:1px solid #111;margin-right:8px;vertical-align:middle;text-align:center;line-height:12px;font-size:10px}@media print{body{margin:0}}`;
+async function save(filename,content,type="text/html"){
+  if(!downloads){ toast("Downloads aren't available in this view"); return false; }
+  try{ await downloads.save({filename,data:new Blob([content],{type})}); return true; }catch{ toast("Download cancelled"); return false; }
+}
+const docHead=(title,right)=>`<div class="head"><div><h1>${title}</h1>${settings.company?`<div>${esc(settings.company)}</div>`:""}</div><div class="mono" style="text-align:right">${right}</div></div>`;
+function empBlock(p,c){ return `<div class="grid"><div><b>Employee:</b> ${esc(p?.name||c?.employeeName)}</div><div><b>Employee ID:</b> <span class="mono">${esc(p?.code||c?.employeeCode)}</span></div>
+  <div><b>Job title:</b> ${esc(p?.title||"")}</div><div><b>Department:</b> ${esc(p?.dept||"")}</div><div><b>National ID:</b> <span class="mono">${esc(p?.nid||"")}</span></div><div><b>Phone:</b> ${esc(p?.phone||"")}</div></div>`; }
+function downloadForm(cid){
+  const c=custody.find(x=>x.id===cid); if(!c) return; const p=person(c.employeeId), t=c.type||"shoot";
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(c.no)}</title><style>${DOC_CSS}</style></head><body>
+  ${docHead(t==="assignment"?"Asset Assignment Form":"Equipment Check-out Receipt",`${esc(c.no)}<br>${dfmt(c.outAt)}`)}
+  ${empBlock(p,c)}
+  <h2>Items received</h2><table><tr><th>Code</th><th>Asset</th><th>Serial</th><th>Condition</th><th>Accessories / notes</th><th>Value (EGP)</th></tr>
+  ${c.items.map(i=>`<tr><td class="mono">${esc(i.code)}</td><td>${esc(i.name)}${i.kit?` <small>(${esc(i.kit)})</small>`:""}</td><td class="mono">${esc(i.serial)}</td><td>${esc(i.conditionOut)}</td><td>${esc(i.accessories)}</td><td>${i.value!=null?fmt.format(i.value):""}</td></tr>`).join("")}
+  <tr><td colspan="5"><b>Total value</b></td><td><b>${fmt.format(sum(c.items,i=>i.value))}</b></td></tr></table>
+  <div class="grid" style="margin-top:10px"><div><b>Purpose:</b> ${esc(c.purpose||"")}</div><div><b>Return by:</b> ${t==="assignment"?"On leaving the company, or on request":c.dueAt?dfmt(c.dueAt):"On request"}</div>${c.outNotes?`<div><b>Notes:</b> ${esc(c.outNotes)}</div>`:""}</div>
+  <h2>Acknowledgment: I confirm that I received the items above and agree to the following</h2><ol>${(c.terms||TERMS).map(x=>`<li>${esc(x)}</li>`).join("")}</ol>
+  <div class="sig"><div><div class="line">Employee signature · ${esc(c.employeeName)} · Date</div></div><div><div class="line">Handed over by · ${esc(c.issuedBy||"")} · Signature</div></div></div>
+  ${(c.returns||[]).map(r=>`<h2>Return · ${dfmt(r.at)}</h2><table><tr><th>Asset</th><th>Returned as</th></tr>${c.items.filter(i=>r.assetIds.includes(i.assetId)).map(i=>`<tr><td>${esc(i.name)} <span class="mono">${esc(i.code)}</span></td><td>${esc(i.conditionIn)}</td></tr>`).join("")}</table>
+    ${r.notes?`<p>${esc(r.notes)}</p>`:""}<div class="sig"><div><div class="line">Employee</div></div><div><div class="line">Received by · ${esc(r.receivedBy||"")}</div></div></div>`).join("")}
+  </body></html>`;
+  save(`${c.no}-${String(c.employeeName).replace(/\s+/g,"-")}.html`,html);
+}
+function downloadStatement(pid){
+  const p=person(pid), h=holdings(pid);
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>Custody statement ${esc(p.name)}</title><style>${DOC_CSS}</style></head><body>
+  ${docHead("Employee Custody Statement",dfmt(Date.now()))}
+  ${empBlock(p)}
+  <h2>Assets currently held</h2><table><tr><th>Code</th><th>Asset</th><th>Serial</th><th>Since</th><th>Record</th><th>Value (EGP)</th></tr>
+  ${h.map(a=>{const c=custody.find(x=>x.id===a.custodyId);return `<tr><td class="mono">${esc(a.code)}</td><td>${esc(a.name)}</td><td class="mono">${esc(a.serial||"")}</td><td>${dfmt(c?.outAt)}</td><td class="mono">${esc(c?.no||"")}</td><td>${a.marketPrice!=null?fmt.format(a.marketPrice):""}</td></tr>`}).join("")}
+  <tr><td colspan="5"><b>Total</b></td><td><b>${fmt.format(sum(h,a=>a.marketPrice))}</b></td></tr></table>
+  <p>I confirm that the assets above are in my custody.</p>
+  <div class="sig"><div><div class="line">Employee signature · Date</div></div><div><div class="line">Manager</div></div></div>
+  </body></html>`;
+  save(`custody-statement-${String(p.code)}.html`,html);
+}
+function downloadClearance(pid){
+  const p=person(pid), h=holdings(pid), checks=(p.clearance||{}).checks||{};
+  const bad=custody.filter(c=>c.employeeId===pid).flatMap(c=>c.items.filter(i=>i.conditionIn==="Missing"||i.conditionIn==="Damaged").map(i=>({...i,no:c.no})));
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>Clearance ${esc(p.name)}</title><style>${DOC_CSS}</style></head><body>
+  ${docHead("Asset Clearance Form",dfmt(Date.now()))}
+  ${empBlock(p)}
+  <h2>Assets still held</h2>${h.length?`<table><tr><th>Code</th><th>Asset</th><th>Serial</th><th>Value (EGP)</th></tr>${h.map(a=>`<tr><td class="mono">${esc(a.code)}</td><td>${esc(a.name)}</td><td class="mono">${esc(a.serial||"")}</td><td>${a.marketPrice!=null?fmt.format(a.marketPrice):""}</td></tr>`).join("")}</table>`:"<p>None. All assets have been returned.</p>"}
+  ${bad.length?`<h2>Damaged or missing items</h2><table><tr><th>Record</th><th>Asset</th><th>Result</th><th>Value (EGP)</th></tr>${bad.map(i=>`<tr><td class="mono">${esc(i.no)}</td><td>${esc(i.name)}</td><td>${esc(i.conditionIn)}</td><td>${i.value!=null?fmt.format(i.value):""}</td></tr>`).join("")}</table>`:""}
+  <h2>Checklist</h2><p>${CLEAR_CHECKS.map(([k,l])=>`<span class="box">${checks[k]?"✓":""}</span>${esc(l)}`).join("<br>")}</p>
+  <div class="sig"><div><div class="line">Employee</div></div><div><div class="line">Equipment custodian</div></div></div>
+  <div class="sig"><div><div class="line">IT / admin</div></div><div><div class="line">HR</div></div></div>
+  </body></html>`;
+  save(`clearance-${String(p.code)}.html`,html);
+}
+function openLabels(){
+  if(!need()) return;
+  openModal(`${head("Print QR labels")}
+  <div class="note">Each label carries the asset code and a QR code. Scanning it with a phone camera opens that asset in this register.</div>
+  <form class="form" id="lbForm">
+    <div class="field"><label for="lb_group">Group</label><select id="lb_group">${optList([["all","All groups"],...["studio","kit","it","office"].map(g=>[g,GROUPS[g].label])],"all")}</select></div>
+    <div class="field"><label for="lb_loc">Location</label><select id="lb_loc">${optList([["","Any location"],...locations.map(l=>[l.id,l.name])],"")}</select></div>
+    <label class="full checkline"><input type="checkbox" id="lb_new" checked> Only assets that haven't been labeled yet</label>
+    <div class="note full" id="lb_n"></div>
+    <div class="form-actions"><button class="btn primary" type="submit">Download label sheet</button><button class="btn ghost" type="button" data-act="close">Cancel</button></div>
+  </form>`);
+  const pick=()=>assets.filter(a=>!isStock(a)&&a.status!=="disposed"&&($("lb_group").value==="all"||groupOf(a)===$("lb_group").value)&&(!$("lb_loc").value||a.locationId===$("lb_loc").value)&&(!$("lb_new").checked||!a.labeledAt));
+  const upd=()=>{ const n=pick().length; $("lb_n").textContent=`${n} label${n===1?"":"s"}`; };
+  $("lbForm").addEventListener("change",upd); upd();
+  $("lbForm").addEventListener("submit",async e=>{
+    e.preventDefault(); const list=pick(); if(!list.length){ toast("No assets match"); return; }
+    if(typeof qrcode==="undefined") toast("QR codes couldn't load. Labels will show codes only.");
+    const html=`<!doctype html><html><head><meta charset="utf-8"><title>Asset labels</title><style>
+    body{font-family:Helvetica,Arial,sans-serif;margin:10mm;color:#111}.sheet{display:grid;grid-template-columns:repeat(3,63mm);gap:4mm}
+    .lb{border:1px dashed #999;border-radius:2mm;padding:3mm;display:flex;gap:3mm;align-items:center;height:30mm;overflow:hidden;break-inside:avoid}
+    .lb svg{width:24mm;height:24mm;flex:none}.c{font-family:Menlo,Consolas,monospace;font-weight:700;font-size:11pt}.n{font-size:8pt;line-height:1.2;margin-top:1mm}.o{font-size:7pt;color:#555;margin-top:1mm}
+    @media print{.lb{border-color:#ccc}}</style></head><body><div class="sheet">
+    ${list.map(a=>`<div class="lb">${qrSvg(APP_URL+"#"+a.code,4)}<div><div class="c">${esc(a.code)}</div><div class="n">${esc(a.name)}</div><div class="o">${esc(settings.company||"Company property")}</div></div></div>`).join("")}
+    </div></body></html>`;
+    if(await save(`asset-labels-${today()}.html`,html)){
+      for(const a of list) await db.doc("assets/"+a.id).update({labeledAt:Date.now()}).catch(()=>{});
+      closeModal(); toast(`${list.length} labels ready. Open the file and print it.`);
+    }
+  });
+}
+
+/* ---------- CSV ---------- */
+document.querySelectorAll("[data-csv]").forEach(b=>b.addEventListener("click",()=>{
+  const kind=b.dataset.csv; let cols, rows;
+  const A=a=>({...a,grp:GROUPS[groupOf(a)].label,cls:a.assetClass==="current"?"Current":"Fixed",typ:typeLabel(a.type),st:STATUS[a.status||"available"],loc:loc(a.locationId)?.name||"",kitc:kit(a.kitId)?.code||"",holder:person(a.holderId)?.name||"",holderCode:person(a.holderId)?.code||"",book:bookValue(a)});
+  if(kind==="assets"){ cols=[["code","Code"],["name","Name"],["grp","Group"],["cls","Accounting class"],["typ","Type"],["brand","Brand"],["model","Model"],["serial","Serial"],["condition","Condition"],["st","Status"],["loc","Location"],["kitc","Kit"],["holder","Held by"],["holderCode","Employee ID"],["purchaseDate","Purchase date"],["purchasePrice","Cost"],["usefulLife","Useful life (yrs)"],["book","Book value"],["marketPrice","Market value"],["warrantyEnd","Warranty ends"],["supplier","Supplier"],["notes","Notes"]];
+    rows=assets.filter(a=>!isStock(a)).map(A); }
+  if(kind==="stock"){ cols=[["code","Code"],["name","Name"],["typ","Type"],["qty","On hand"],["unit","Unit"],["reorderLevel","Reorder at"],["purchasePrice","Unit cost"],["loc","Location"],["supplier","Supplier"]]; rows=stockItems().map(A); }
+  if(kind==="employees"){ cols=[["code","Employee ID"],["name","Name"],["title","Job title"],["dept","Department"],["phone","Phone"],["email","Email"],["nid","National ID"],["hireDate","Hire date"],["status","Status"],["policySigned","Policy signed"],["items","Items held"],["value","Value held"]];
+    rows=people.map(p=>{const h=holdings(p.id);return{...p,items:h.length,value:sum(h,a=>a.marketPrice)}}); }
+  if(kind==="custody"){ cols=[["no","Record"],["typ","Type"],["employeeCode","Employee ID"],["employeeName","Employee"],["purpose","Purpose"],["out","Handed over"],["due","Due"],["code","Asset code"],["name","Asset"],["serial","Serial"],["value","Value"],["returned","Returned"],["conditionIn","Returned as"],["signed","Signed copy"]];
+    rows=custody.flatMap(c=>c.items.map(i=>({...c,...i,typ:CTYPES[c.type||"shoot"],out:new Date(c.outAt).toISOString().slice(0,10),due:c.dueAt||"",returned:i.returnedAt?new Date(i.returnedAt).toISOString().slice(0,10):"",signed:(c.signedScans||[]).length?"Yes":"No"}))); }
+  if(kind==="maintenance"){ cols=[["code","Asset code"],["name","Asset"],["date","Date"],["kind","Type"],["vendor","Vendor"],["cost","Cost"],["notes","Notes"]]; rows=maint.map(m=>({...m,name:asset(m.assetId)?.name||""})); }
+  const cell=v=>`"${String(v??"").replace(/"/g,'""')}"`;
+  const csv="﻿"+[cols.map(c=>cell(c[1])).join(","),...rows.map(r=>cols.map(c=>cell(r[c[0]])).join(","))].join("\r\n");
+  save(`${kind}-${today()}.csv`,csv,"text/csv");
+}));
+
+/* ---------- one click handler ---------- */
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("[data-act]"); if(!b) return;
+  const d=b.dataset;
+  switch(d.act){
+    case "close": closeModal(); break;
+    case "asset": openDetail(d.id); break;
+    case "profile": openProfile(d.pid); break;
+    case "edit-asset": openAssetForm(d.id); break;
+    case "new-stock": openAssetForm(null,{group:"consumable",type:"BAT",assetClass:"current",unit:"pcs"}); break;
+    case "stock-move": openStockMove(d.id,d.dir); break;
+    case "handover": openHandover({assetIds:d.id?[d.id]:[],employeeId:d.pid||"",kitId:d.kid||""}); break;
+    case "return": openReturn(d.cid); break;
+    case "form": downloadForm(d.cid); break;
+    case "statement": downloadStatement(d.pid); break;
+    case "clearance": openClearance(d.pid); break;
+    case "clear-form": downloadClearance(d.pid); break;
+    case "clear-done": { const p=person(d.pid); try{ await db.doc("employees/"+d.pid).update({status:"left",clearance:{...(p.clearance||{}),clearedAt:Date.now(),by:$("clr_by")?.value.trim()||""}}); toast("Clearance complete"); }catch{ toast("Couldn't save"); } break; }
+    case "edit-person": openPersonForm(d.pid); break;
+    case "new-person": openPersonForm(); break;
+    case "del-person": b.outerHTML=`<span class="confirm">Delete this employee? <button class="btn sm danger" data-act="del-person-yes" data-pid="${d.pid}">Delete</button></span>`; break;
+    case "del-person-yes": try{ await db.doc("employees/"+d.pid).delete(); closeModal(); toast("Employee deleted"); }catch{ toast("Couldn't delete"); } break;
+    case "new-kit": openKitForm(); break;
+    case "edit-kit": openKitForm(d.kid); break;
+    case "del-kit": b.outerHTML=`<span class="confirm">Delete this kit? Its items stay in the register. <button class="btn sm danger" type="button" data-act="del-kit-yes" data-kid="${d.kid}">Delete</button></span>`; break;
+    case "del-kit-yes": try{ for(const a of assets.filter(x=>x.kitId===d.kid)) await db.doc("assets/"+a.id).update({kitId:""}); await db.doc("kits/"+d.kid).delete(); closeModal(); toast("Kit deleted"); }catch{ toast("Couldn't delete"); } break;
+    case "count": openCount(d.kind,d.sid); break;
+    case "count-loc": openCount("location",$("countLoc").value); break;
+    case "count-kit": openCount("kit",$("countKit").value); break;
+    case "mark-lost": try{ await db.doc("assets/"+d.id).update({status:"lost"}); toast("Marked as lost"); }catch{ toast("Couldn't save"); } break;
+    case "labels": openLabels(); break;
+    case "add-maint": openMaintForm(d.id); break;
+    case "to-repair": openMaintForm(d.id,"to"); break;
+    case "from-repair": openMaintForm(d.id,"from"); break;
+    case "dispose": openDispose(d.id); break;
+    case "del-asset": b.outerHTML=`<span class="confirm">Delete for good? Use Dispose to keep the record. <button class="btn sm danger" data-act="del-asset-yes" data-id="${d.id}">Delete</button></span>`; break;
+    case "del-asset-yes": { const a=asset(d.id); try{ await db.doc("assets/"+d.id).delete(); for(const p of a?.photoIds||[]) store?.delete(p).catch(()=>{}); closeModal(); toast("Asset deleted"); }catch{ toast("Couldn't delete"); } break; }
+    case "del-loc": b.outerHTML=`<span class="confirm">Remove? Its assets become "Not set". <button class="btn sm danger" data-act="del-loc-yes" data-lid="${d.lid}">Remove</button></span>`; break;
+    case "del-loc-yes": try{ for(const a of assets.filter(x=>x.locationId===d.lid)) await db.doc("assets/"+a.id).update({locationId:""}); await db.doc("locations/"+d.lid).delete(); toast("Location removed"); }catch{ toast("Couldn't remove"); } break;
+    case "price": { const a=asset(d.id); b.disabled=true; b.textContent="Estimating…";
+      try{ const r=await reestimate(a); await db.doc("assets/"+d.id).update({priceLow:r.priceLow??null,marketPrice:r.marketPrice??null,priceHigh:r.priceHigh??null,priceNote:r.priceNote||"",priceUpdatedAt:Date.now()}); toast("Value updated"); }
+      catch(err){ toast(err?.code?sampleErr(err):"Couldn't update the value"); b.disabled=false; b.textContent="Update value"; } break; }
+    case "goto": show(d.view); if(d.cf){ cFilter=d.cf; renderCustody(); } break;
+  }
+});
+
+/* ---------- render all ---------- */
+function renderAll(){
+  const L=live();
+  $("sumMarket").innerHTML=`${fmt.format(sum(L,a=>a.marketPrice))}<small>EGP</small>`;
+  $("sumBook").innerHTML=`${fmt.format(sum(L,a=>bookValue(a)))}<small>EGP</small>`;
+  $("sumOut").innerHTML=`${fmt.format(L.filter(a=>a.status==="custody").length)}<small>of ${fmt.format(L.length)}</small>`;
+  $("cAssets").textContent=L.length; $("cStock").textContent=stockItems().length; $("cKits").textContent=kits.length; $("cPeople").textContent=people.filter(p=>p.status!=="left").length;
+  $("cCustody").textContent=custody.filter(c=>c.status!=="closed").length; $("cCounts").textContent=countsDue().length;
+  const od=custody.filter(isOverdue).length, low=stockItems().filter(isLow).length, due=countsDue().length, uns=custody.filter(c=>c.status!=="closed"&&!(c.signedScans||[]).length).length, rep=L.filter(a=>a.status==="repair").length, lost=L.filter(a=>a.status==="lost").length, leaving=people.filter(p=>p.status==="leaving").length;
+  const at=[[od,"bad","shoot returns overdue","custody","overdue"],[lost,"bad","assets lost","assets"],[low,"warn","stock items to reorder","stock"],[due,"warn","counts due","counts"],[uns,"warn","handovers without a signed copy","custody","unsigned"],[rep,"warn","under repair","assets"],[leaving,"warn","employees in clearance","people"]].filter(x=>x[0]);
+  $("attention").innerHTML=at.map(([n,c,l,v,cf])=>`<button class="attn ${c}" type="button" data-act="goto" data-view="${v}"${cf?` data-cf="${cf}"`:""}><b>${n}</b> ${l}</button>`).join("");
+  renderAssets(); renderStock(); renderKits(); renderPeople(); renderCustody(); renderCounts(); renderSetup();
+  if(modalView && !$("overlay").hidden){
+    const html=modalView.kind==="asset"?detailHTML(modalView.id):modalView.kind==="profile"?profileHTML(modalView.id):modalView.kind==="clearance"?clearanceHTML(modalView.id):null;
+    if(html){ const st=$("modal").scrollTop; $("modal").innerHTML=html; $("modal").scrollTop=st; }
+  }
+  if(!hashDone && assets.length){ hashDone=true; const h=decodeURIComponent(location.hash.slice(1)); const a=assets.find(x=>x.code===h); if(a) openDetail(a.id); }
+}
+
+/* ---------- boot ---------- */
+{ const h=decodeURIComponent(location.hash.slice(1)); if(VIEWS.includes(h)){ show(h); hashDone=true; } else { show("assets"); hashDone=!h; } }
+renderAll();
+(async()=>{
+  const use=n=>window.claude?.use?window.claude.use(n).catch(()=>null):Promise.resolve(null);
+  [db,store,sample,downloads]=await Promise.all([use("db"),use("assets"),use("sample"),use("downloads")]);
+  if(store?.base) BLOB=store.base;
+  const caps=sample?await sample.limits().catch(()=>null):null;
+  $("capNote").textContent=caps?.images
+    ? "Values are Claude's estimates of the Egyptian market, not live listings. Check them before selling or insuring."
+    : "Photo identification is not available (server API key missing).";
+  if(!db){
+    $("assetList").innerHTML=`<div class="empty-state"><strong>Register unavailable here</strong>Check the Supabase environment variables and reload.</div>`;
+    return;
+  }
+  const fail=()=>toast("Couldn't read the register. Check your access and reload.");
+  const sub=(name,set)=>db.collection(name).onSnapshot(s=>{ set(s.docs.map(d=>({id:d.id,...d.data()}))); renderAll(); },fail);
+  sub("assets",v=>assets=v.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)));
+  sub("employees",v=>people=v); sub("custody",v=>custody=v); sub("kits",v=>kits=v); sub("locations",v=>locations=v);
+  sub("maintenance",v=>maint=v); sub("counts",v=>counts=v); sub("stockMoves",v=>moves=v);
+  db.doc("settings/main").onSnapshot(s=>{ settings=s.exists?s.data():{}; renderAll(); });
+})();
+</script>
+</body></html>

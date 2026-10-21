@@ -1,0 +1,4 @@
+{
+  "outputDirectory": "public",
+  "functions": { "api/identify.js": { "maxDuration": 60 } }
+}
